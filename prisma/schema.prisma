@@ -1,0 +1,335 @@
+generator client {
+  provider        = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model categorias {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique @db.VarChar(100)
+  descripcion String?
+  activo      Boolean     @default(true)
+  productos   productos[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model combo_items {
+  id          Int       @id @default(autoincrement())
+  combo_id    Int
+  producto_id Int
+  cantidad    Int       @default(1) @db.SmallInt
+  combos      combos    @relation(fields: [combo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productos   productos @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([combo_id, producto_id])
+  @@index([combo_id], map: "idx_combo_items_combo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model combos {
+  id           Int            @id @default(autoincrement())
+  nombre       String         @db.VarChar(150)
+  descripcion  String?
+  precio       Decimal        @db.Decimal(8, 2)
+  disponible   Boolean        @default(true)
+  imagen_url   String?
+  combo_items  combo_items[]
+  orden_combos orden_combos[]
+  promociones  promociones[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model empleados {
+  id                      Int                       @id @default(autoincrement())
+  nombre                  String                    @db.VarChar(100)
+  apellido                String                    @db.VarChar(100)
+  rol                     String                    @db.VarChar(50)
+  telefono                String?                   @db.VarChar(20)
+  fecha_ingreso           DateTime                  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  activo                  Boolean                   @default(true)
+  mermas                  mermas[]
+  movimientos_inventario  movimientos_inventario[]
+  orden_estados_historial orden_estados_historial[]
+  ordenes                 ordenes[]
+  servicios               servicios[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ingredientes {
+  id                     Int                      @id @default(autoincrement())
+  nombre                 String                   @unique @db.VarChar(150)
+  unidad_medida_id       Int
+  stock_actual           Decimal                  @default(0) @db.Decimal(12, 3)
+  stock_minimo           Decimal                  @default(0) @db.Decimal(12, 3)
+  stock_maximo           Decimal?                 @db.Decimal(12, 3)
+  costo_unitario         Decimal?                 @db.Decimal(10, 4)
+  proveedor              String?                  @db.VarChar(150)
+  activo                 Boolean                  @default(true)
+  unidades_medida        unidades_medida          @relation(fields: [unidad_medida_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  mermas                 mermas[]
+  movimientos_inventario movimientos_inventario[]
+  receta_modificadores   receta_modificadores[]
+  recetas                recetas[]
+
+  @@index([stock_actual], map: "idx_stock_bajo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mermas {
+  id                     Int                    @id @default(autoincrement())
+  movimiento_id          Int
+  ingrediente_id         Int
+  cantidad               Decimal                @db.Decimal(12, 3)
+  motivo                 String?                @db.VarChar(200)
+  costo_perdida          Decimal?               @db.Decimal(10, 2)
+  empleado_id            Int?
+  servicio_id            Int?
+  registrado_en          DateTime               @default(now()) @db.Timestamptz(6)
+  empleados              empleados?             @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ingredientes           ingredientes           @relation(fields: [ingrediente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  movimientos_inventario movimientos_inventario @relation(fields: [movimiento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  servicios              servicios?             @relation(fields: [servicio_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model metodos_pago {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique @db.VarChar(80)
+  pagos  pagos[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model modificador_grupos {
+  id                          Int                           @id @default(autoincrement())
+  nombre                      String                        @db.VarChar(100)
+  descripcion                 String?
+  seleccion                   String                        @default("opcional") @db.VarChar(20)
+  max_selecciones             Int                           @default(1) @db.SmallInt
+  modificadores               modificadores[]
+  producto_modificador_grupos producto_modificador_grupos[]
+}
+
+model modificadores {
+  id                          Int                           @id @default(autoincrement())
+  grupo_id                    Int
+  nombre                      String                        @db.VarChar(100)
+  precio_adicional            Decimal                       @default(0.00) @db.Decimal(8, 2)
+  disponible                  Boolean                       @default(true)
+  modificador_grupos          modificador_grupos            @relation(fields: [grupo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  orden_detalle_modificadores orden_detalle_modificadores[]
+  receta_modificadores        receta_modificadores[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model movimientos_inventario {
+  id             Int          @id @default(autoincrement())
+  ingrediente_id Int
+  tipo           String       @db.VarChar(30)
+  cantidad       Decimal      @db.Decimal(12, 3)
+  referencia_id  Int?
+  empleado_id    Int?
+  motivo         String?
+  creado_en      DateTime     @default(now()) @db.Timestamptz(6)
+  mermas         mermas[]
+  empleados      empleados?   @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ingredientes   ingredientes @relation(fields: [ingrediente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([ingrediente_id], map: "idx_movimientos_ingr")
+  @@index([tipo], map: "idx_movimientos_tipo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model orden_combos {
+  id              Int      @id @default(autoincrement())
+  orden_id        Int
+  combo_id        Int
+  cantidad        Int      @default(1) @db.SmallInt
+  precio_unitario Decimal  @db.Decimal(8, 2)
+  subtotal        Decimal? @default(dbgenerated("((cantidad)::numeric * precio_unitario)")) @db.Decimal(10, 2)
+  combos          combos   @relation(fields: [combo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes         ordenes  @relation(fields: [orden_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([orden_id], map: "idx_orden_combos_orden")
+}
+
+model orden_detalle_modificadores {
+  id               Int            @id @default(autoincrement())
+  orden_detalle_id Int
+  modificador_id   Int
+  precio_adicional Decimal        @default(0) @db.Decimal(8, 2)
+  modificadores    modificadores  @relation(fields: [modificador_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  orden_detalles   orden_detalles @relation(fields: [orden_detalle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model orden_detalles {
+  id                          Int                           @id @default(autoincrement())
+  orden_id                    Int
+  producto_id                 Int
+  cantidad                    Int                           @default(1) @db.SmallInt
+  precio_unitario             Decimal                       @db.Decimal(8, 2)
+  subtotal                    Decimal?                      @default(dbgenerated("((cantidad)::numeric * precio_unitario)")) @db.Decimal(10, 2)
+  notas_item                  String?
+  orden_detalle_modificadores orden_detalle_modificadores[]
+  ordenes                     ordenes                       @relation(fields: [orden_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productos                   productos                     @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([orden_id], map: "idx_orden_detalles_orden")
+}
+
+model orden_estados_historial {
+  id            Int        @id @default(autoincrement())
+  orden_id      Int
+  estado        String     @db.VarChar(30)
+  empleado_id   Int?
+  notas         String?
+  registrado_en DateTime   @default(now()) @db.Timestamptz(6)
+  empleados     empleados? @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes       ordenes    @relation(fields: [orden_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ordenes {
+  id                      Int                       @id @default(autoincrement())
+  numero                  String                    @unique @default(dbgenerated("((('ORD-'::text || to_char(now(), 'YYYYMMDD'::text)) || '-'::text) || lpad((nextval('ordenes_id_seq'::regclass))::text, 4, '0'::text))")) @db.VarChar(20)
+  servicio_id             Int
+  empleado_id             Int?
+  estado                  String                    @default("pendiente") @db.VarChar(30)
+  tipo_servicio           String                    @default("mostrador") @db.VarChar(20)
+  nombre_cliente          String?                   @db.VarChar(150)
+  notas_orden             String?
+  promocion_id            Int?
+  subtotal                Decimal                   @default(0) @db.Decimal(10, 2)
+  descuento               Decimal                   @default(0) @db.Decimal(10, 2)
+  total                   Decimal?                  @default(dbgenerated("(subtotal - descuento)")) @db.Decimal(10, 2)
+  creado_en               DateTime                  @default(now()) @db.Timestamptz(6)
+  actualizado_en          DateTime                  @default(now()) @db.Timestamptz(6)
+  orden_combos            orden_combos[]
+  orden_detalles          orden_detalles[]
+  orden_estados_historial orden_estados_historial[]
+  empleados               empleados?                @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  promociones             promociones?              @relation(fields: [promocion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  servicios               servicios                 @relation(fields: [servicio_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pagos                   pagos[]
+
+  @@index([creado_en(sort: Desc)], map: "idx_ordenes_creado")
+  @@index([estado], map: "idx_ordenes_estado")
+  @@index([servicio_id], map: "idx_ordenes_servicio")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model pagos {
+  id             Int          @id @default(autoincrement())
+  orden_id       Int
+  metodo_pago_id Int
+  monto          Decimal      @db.Decimal(10, 2)
+  referencia     String?      @db.VarChar(100)
+  pagado_en      DateTime     @default(now()) @db.Timestamptz(6)
+  metodos_pago   metodos_pago @relation(fields: [metodo_pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes        ordenes      @relation(fields: [orden_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model producto_modificador_grupos {
+  producto_id        Int
+  grupo_id           Int
+  modificador_grupos modificador_grupos @relation(fields: [grupo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productos          productos          @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([producto_id, grupo_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model productos {
+  id                          Int                           @id @default(autoincrement())
+  categoria_id                Int
+  nombre                      String                        @db.VarChar(150)
+  descripcion                 String?
+  precio_base                 Decimal                       @db.Decimal(8, 2)
+  disponible                  Boolean                       @default(true)
+  imagen_url                  String?
+  combo_items                 combo_items[]
+  orden_detalles              orden_detalles[]
+  producto_modificador_grupos producto_modificador_grupos[]
+  categorias                  categorias                    @relation(fields: [categoria_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recetas                     recetas[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model promociones {
+  id             Int       @id @default(autoincrement())
+  nombre         String    @db.VarChar(150)
+  descripcion    String?
+  tipo_descuento String    @db.VarChar(20)
+  valor          Decimal   @db.Decimal(8, 2)
+  combo_id       Int?
+  solo_dia       String?   @db.VarChar(10)
+  fecha_inicio   DateTime? @db.Date
+  fecha_fin      DateTime? @db.Date
+  activo         Boolean   @default(true)
+  ordenes        ordenes[]
+  combos         combos?   @relation(fields: [combo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([activo, solo_dia], map: "idx_promociones_activo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model receta_modificadores {
+  id             Int           @id @default(autoincrement())
+  modificador_id Int
+  ingrediente_id Int
+  cantidad       Decimal       @db.Decimal(10, 4)
+  ingredientes   ingredientes  @relation(fields: [ingrediente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  modificadores  modificadores @relation(fields: [modificador_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([modificador_id, ingrediente_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model recetas {
+  id             Int          @id @default(autoincrement())
+  producto_id    Int
+  ingrediente_id Int
+  cantidad       Decimal      @db.Decimal(10, 4)
+  ingredientes   ingredientes @relation(fields: [ingrediente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productos      productos    @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([producto_id, ingrediente_id])
+  @@index([producto_id], map: "idx_recetas_producto")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model servicios {
+  id            Int         @id @default(autoincrement())
+  ubicacion_id  Int
+  empleado_id   Int?
+  fecha_inicio  DateTime    @default(now()) @db.Timestamptz(6)
+  fecha_fin     DateTime?   @db.Timestamptz(6)
+  estado        String      @default("abierto") @db.VarChar(30)
+  capacidad_max Int?
+  notas         String?
+  mermas        mermas[]
+  ordenes       ordenes[]
+  empleados     empleados?  @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ubicaciones   ubicaciones @relation(fields: [ubicacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ubicaciones {
+  id        Int         @id @default(autoincrement())
+  nombre    String      @db.VarChar(150)
+  tipo      String      @db.VarChar(50)
+  direccion String?
+  ciudad    String?     @db.VarChar(100)
+  latitud   Decimal?    @db.Decimal(9, 6)
+  longitud  Decimal?    @db.Decimal(9, 6)
+  activo    Boolean     @default(true)
+  servicios servicios[]
+}
+
+model unidades_medida {
+  id           Int            @id @default(autoincrement())
+  nombre       String         @unique @db.VarChar(50)
+  simbolo      String         @unique @db.VarChar(10)
+  ingredientes ingredientes[]
+}
