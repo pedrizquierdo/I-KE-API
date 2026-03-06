@@ -84,9 +84,16 @@ export const fetchCombos = async () => {
 }
 
 export const fetchPromociones = async () => {
-  const hoy = new Date()
-  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
-  const diaHoy = diasSemana[hoy.getDay()] as string
+  const ahora = new Date()
+  
+  // Railway corre en UTC, ajustamos a la zona horaria de Sonora (UTC-7)
+  const zonaHoraria = 'America/Hermosillo'
+  const diaHoy = ahora.toLocaleDateString('es-MX', { 
+    weekday: 'long', 
+    timeZone: zonaHoraria 
+  }).normalize('NFD')
+   .replace(/[\u0300-\u036f]/g, '') // quita acentos
+   .toLowerCase()
 
   return await prisma.promociones.findMany({
     where: {
@@ -99,13 +106,13 @@ export const fetchPromociones = async () => {
         {
           OR: [
             { fecha_inicio: null },
-            { fecha_inicio: { lte: hoy } },
+            { fecha_inicio: { lte: ahora } },
           ],
         },
         {
           OR: [
             { fecha_fin: null },
-            { fecha_fin: { gte: hoy } },
+            { fecha_fin: { gte: ahora } },
           ],
         },
       ],
