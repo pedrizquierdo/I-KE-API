@@ -1,5 +1,5 @@
 generator client {
-  provider        = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -55,6 +55,7 @@ model empleados {
   orden_estados_historial orden_estados_historial[]
   ordenes                 ordenes[]
   servicios               servicios[]
+  usuarios                usuarios[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -73,8 +74,6 @@ model ingredientes {
   movimientos_inventario movimientos_inventario[]
   receta_modificadores   receta_modificadores[]
   recetas                recetas[]
-
-  @@index([stock_actual], map: "idx_stock_bajo")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -333,4 +332,15 @@ model unidades_medida {
   nombre       String         @unique @db.VarChar(50)
   simbolo      String         @unique @db.VarChar(10)
   ingredientes ingredientes[]
+}
+
+model usuarios {
+  id          Int        @id @default(autoincrement())
+  email       String     @unique @db.VarChar(150)
+  password    String     @db.VarChar(255)
+  rol         String     @db.VarChar(50)
+  empleado_id Int?
+  activo      Boolean    @default(true)
+  creado_en   DateTime   @default(now()) @db.Timestamptz(6)
+  empleados   empleados? @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
