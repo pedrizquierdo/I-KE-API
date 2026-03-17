@@ -11,7 +11,7 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:3001',
+  origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
   credentials: true, // necesario para cookies
 }))
 app.use(express.json())
