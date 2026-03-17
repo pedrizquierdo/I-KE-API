@@ -11,8 +11,12 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
-  credentials: true, // necesario para cookies
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    process.env.FRONTEND_URL ?? '',
+  ].filter(Boolean),
+  credentials: true,
 }))
 app.use(express.json())
 app.use(cookieParser()) // para leer cookies del refresh token
