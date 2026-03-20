@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import cookieParser from 'cookie-parser'
 import { menuRoutes } from './modules/menu/menu.routes'
 import { authRoutes } from './modules/auth/auth.routes'
+import { servicesRoutes } from './modules/services/services.routes'
 
 dotenv.config()
 
@@ -24,6 +25,7 @@ app.use(cookieParser()) // para leer cookies del refresh token
 // Rutas
 app.use('/menu', menuRoutes)
 app.use('/auth', authRoutes)
+app.use('/services', servicesRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'I KE APP backend corriendo' })
