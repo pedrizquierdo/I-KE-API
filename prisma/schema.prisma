@@ -205,12 +205,14 @@ model ordenes {
   total                   Decimal?                  @default(dbgenerated("(subtotal - descuento)")) @db.Decimal(10, 2)
   creado_en               DateTime                  @default(now()) @db.Timestamptz(6)
   actualizado_en          DateTime                  @default(now()) @db.Timestamptz(6)
+  usuario_id              Int?
   orden_combos            orden_combos[]
   orden_detalles          orden_detalles[]
   orden_estados_historial orden_estados_historial[]
   empleados               empleados?                @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   promociones             promociones?              @relation(fields: [promocion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   servicios               servicios                 @relation(fields: [servicio_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                usuarios?                 @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   pagos                   pagos[]
 
   @@index([creado_en(sort: Desc)], map: "idx_ordenes_creado")
@@ -342,5 +344,6 @@ model usuarios {
   empleado_id Int?
   activo      Boolean    @default(true)
   creado_en   DateTime   @default(now()) @db.Timestamptz(6)
+  ordenes     ordenes[]
   empleados   empleados? @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

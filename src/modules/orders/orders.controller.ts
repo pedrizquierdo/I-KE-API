@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
-import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden } from './orders.service'
+import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden, getOrdenesByUsuario } from './orders.service'
+import { prisma } from '../../config/db'
 
 export const crearOrdenController = async (req: Request, res: Response) => {
   try {
@@ -12,7 +13,7 @@ export const crearOrdenController = async (req: Request, res: Response) => {
 
     const orden = await crearOrden(
       { productos, combos, notas, nombreCliente },
-      req.usuario?.id
+      req.usuario?.id  // ← ya estaba, solo verificar que esté
     )
 
     res.status(201).json(orden)
@@ -73,5 +74,19 @@ export const cambiarEstadoOrdenController = async (req: Request, res: Response) 
   } catch (error) {
     const mensaje = error instanceof Error ? error.message : 'Error al cambiar estado'
     res.status(400).json({ error: mensaje })
+  }
+}
+
+export const getOrdenesByUsuarioController = async (req: Request, res: Response) => {
+  try {
+    const usuarioId = req.usuario?.id
+    if (!usuarioId) {
+      res.status(401).json({ error: 'No autenticado' })
+      return
+    }
+    const ordenes = await getOrdenesByUsuario(usuarioId)
+    res.json(ordenes)
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener pedidos' })
   }
 }

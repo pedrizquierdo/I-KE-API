@@ -71,6 +71,7 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
   const orden = await prisma.ordenes.create({
     data: {
       servicio_id: servicio.id,
+      usuario_id: usuarioId ?? null,
       nombre_cliente: datos.nombreCliente ?? null,
       notas_orden: datos.notas ?? null,
       subtotal,
@@ -221,4 +222,27 @@ export const cambiarEstadoOrden = async (
   })
 
   return ordenActualizada
+}
+
+export const getOrdenesByUsuario = async (usuarioId: number) => {
+  return await prisma.ordenes.findMany({
+    where: { usuario_id: usuarioId },
+    include: {
+      orden_detalles: {
+        include: {
+          productos: {
+            select: { id: true, nombre: true, precio_base: true }
+          }
+        }
+      },
+      orden_combos: {
+        include: {
+          combos: {
+            select: { id: true, nombre: true, precio: true }
+          }
+        }
+      }
+    },
+    orderBy: { creado_en: 'desc' }
+  })
 }

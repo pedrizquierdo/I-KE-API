@@ -4,6 +4,7 @@ import {
   getOrdenesController,
   getOrdenByIdController,
   cambiarEstadoOrdenController,
+  getOrdenesByUsuarioController,
 } from './orders.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 
@@ -20,5 +21,7 @@ router.get('/:id', verificarToken, getOrdenByIdController)
 
 // Cambiar estado — solo empleados
 router.patch('/:id/status', verificarToken, verificarRol('gerente', 'cajero', 'cocinero', 'repartidor'), cambiarEstadoOrdenController)
+
+router.get('/my', verificarToken, getOrdenesByUsuarioController)
 
 export { router as ordersRoutes }
