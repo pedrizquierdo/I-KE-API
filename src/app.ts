@@ -7,6 +7,7 @@ import { authRoutes } from './modules/auth/auth.routes'
 import { servicesRoutes } from './modules/services/services.routes'
 import { ordersRoutes } from './modules/orders/orders.routes'
 import { paymentsRoutes } from './modules/payments/payments.routes'
+import { usersRoutes } from './modules/users/users.routes'
 
 dotenv.config()
 
@@ -30,6 +31,7 @@ app.use('/auth', authRoutes)
 app.use('/services', servicesRoutes)
 app.use('/orders', ordersRoutes)
 app.use('/payments', paymentsRoutes)
+app.use('/users', usersRoutes)
 
 
 app.get('/health', (_req, res) => {
