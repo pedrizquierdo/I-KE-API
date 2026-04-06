@@ -6,6 +6,7 @@ import { menuRoutes } from './modules/menu/menu.routes'
 import { authRoutes } from './modules/auth/auth.routes'
 import { servicesRoutes } from './modules/services/services.routes'
 import { ordersRoutes } from './modules/orders/orders.routes'
+import { paymentsRoutes } from './modules/payments/payments.routes'
 
 dotenv.config()
 
@@ -28,6 +29,8 @@ app.use('/menu', menuRoutes)
 app.use('/auth', authRoutes)
 app.use('/services', servicesRoutes)
 app.use('/orders', ordersRoutes)
+app.use('/payments', paymentsRoutes)
+
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'I KE APP backend corriendo' })
