@@ -1,44 +1,45 @@
 import { prisma } from '../../config/db'
+import { Decimal } from '@prisma/client/runtime/library'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ProcesarPagoDTO {
-  ordenId: number
+  ordenId:      number
   metodoPagoId: number
-  monto: number
-  referencia?: string
+  monto:        number
+  referencia?:  string
 }
+
+// ─── Helper: aritmética segura con Decimal ────────────────────────────────────
+const toNum = (val: Decimal | string | number | null | undefined): number =>
+  new Decimal(val?.toString() ?? '0').toNumber()
 
 // ─── Procesar pago ────────────────────────────────────────────────────────────
 export const procesarPago = async (datos: ProcesarPagoDTO) => {
-  // 1. Verificar que la orden existe y no está pagada ni cancelada
+  // 1. Verificar que la orden existe y no está cancelada
   const orden = await prisma.ordenes.findUnique({
-    where: { id: datos.ordenId },
-    include: { pagos: true }
+    where:   { id: datos.ordenId },
+    include: { pagos: true },
   })
 
-  if (!orden) {
-    throw new Error('Orden no encontrada')
-  }
-
+  if (!orden) throw new Error('Orden no encontrada')
   if (orden.estado === 'cancelada') {
     throw new Error('No se puede pagar una orden cancelada')
   }
 
-  // 2. Verificar que el método de pago existe
+  // 2. Verificar método de pago
   const metodoPago = await prisma.metodos_pago.findUnique({
-    where: { id: datos.metodoPagoId }
+    where: { id: datos.metodoPagoId },
   })
+  if (!metodoPago) throw new Error('Método de pago no válido')
 
-  if (!metodoPago) {
-    throw new Error('Método de pago no válido')
+  // 3. Calcular montos con Decimal para evitar errores de punto flotante
+  const totalOrden   = toNum(orden.total)
+  const totalPagado  = orden.pagos.reduce((sum, p) => sum + toNum(p.monto), 0)
+  const restante     = parseFloat((totalOrden - totalPagado).toFixed(2))
+
+  if (datos.monto <= 0) {
+    throw new Error('El monto debe ser mayor a cero')
   }
-
-  // 3. Calcular total ya pagado
-  const totalPagado = orden.pagos.reduce(
-    (sum, p) => sum + parseFloat(p.monto.toString()), 0
-  )
-  const totalOrden = parseFloat(orden.total?.toString() ?? '0')
-  const restante = totalOrden - totalPagado
 
   if (datos.monto > restante + 0.01) {
     throw new Error(`El monto excede el restante a pagar ($${restante.toFixed(2)})`)
@@ -47,34 +48,41 @@ export const procesarPago = async (datos: ProcesarPagoDTO) => {
   // 4. Registrar el pago
   const pago = await prisma.pagos.create({
     data: {
-      orden_id: datos.ordenId,
+      orden_id:       datos.ordenId,
       metodo_pago_id: datos.metodoPagoId,
-      monto: datos.monto,
-      referencia: datos.referencia ?? null,
+      monto:          datos.monto,
+      referencia:     datos.referencia ?? null,
     },
     include: {
-      metodos_pago: { select: { id: true, nombre: true } }
-    }
+      metodos_pago: { select: { id: true, nombre: true } },
+    },
   })
 
-  // 5. Verificar si la orden quedó completamente pagada
-  const nuevoTotalPagado = totalPagado + datos.monto
-  const ordenPagada = nuevoTotalPagado >= totalOrden - 0.01
+  // 5. Calcular si quedó completamente pagada
+  const nuevoTotalPagado = parseFloat((totalPagado + datos.monto).toFixed(2))
+  const ordenPagada      = nuevoTotalPagado >= totalOrden - 0.01
+  const cambio           = datos.monto > restante
+    ? parseFloat((datos.monto - restante).toFixed(2))
+    : 0
 
-  if (ordenPagada) {
-    await prisma.ordenes.update({
-      where: { id: datos.ordenId },
-      data: { estado: 'entregada', actualizado_en: new Date() }
-    })
-  }
+  // ─── NOTA IMPORTANTE ───────────────────────────────────────────────────────
+  // El pago NO cambia automáticamente el estado de la orden.
+  //
+  // Razón: en un taquero, una orden puede estar pagada mientras aún está
+  // en preparación o lista en la barra. El estado de la orden (flujo de cocina)
+  // y el estado del pago son conceptos independientes.
+  //
+  // El cajero/mesero debe marcar la orden como "entregada" manualmente
+  // a través de PATCH /orders/:id/status cuando se la entregue al cliente.
+  // ───────────────────────────────────────────────────────────────────────────
 
   return {
     pago,
     ordenPagada,
     totalOrden,
-    totalPagado: nuevoTotalPagado,
-    cambio: datos.monto > restante ? datos.monto - restante : 0,
-    restante: ordenPagada ? 0 : restante - datos.monto,
+    totalPagado:   nuevoTotalPagado,
+    cambio,
+    restante:      ordenPagada ? 0 : parseFloat((restante - datos.monto).toFixed(2)),
   }
 }
 
@@ -89,58 +97,63 @@ export const getPagosByOrden = async (ordenId: number) => {
     where: { id: ordenId },
     include: {
       pagos: {
-        include: {
-          metodos_pago: { select: { id: true, nombre: true } }
-        },
-        orderBy: { pagado_en: 'asc' }
+        include: { metodos_pago: { select: { id: true, nombre: true } } },
+        orderBy: { pagado_en: 'asc' },
       },
       orden_detalles: {
         include: {
-          productos: { select: { id: true, nombre: true, precio_base: true } }
-        }
+          productos: { select: { id: true, nombre: true, precio_base: true } },
+        },
       },
       orden_combos: {
         include: {
-          combos: { select: { id: true, nombre: true, precio: true } }
-        }
-      }
-    }
+          combos: { select: { id: true, nombre: true, precio: true } },
+        },
+      },
+    },
   })
 
   if (!orden) throw new Error('Orden no encontrada')
 
-  const totalPagado = orden.pagos.reduce(
-    (sum, p) => sum + parseFloat(p.monto.toString()), 0
-  )
-  const totalOrden = parseFloat(orden.total?.toString() ?? '0')
+  const totalOrden  = toNum(orden.total)
+  const totalPagado = orden.pagos.reduce((sum, p) => sum + toNum(p.monto), 0)
 
   return {
     orden,
-    totalPagado,
-    restante: Math.max(0, totalOrden - totalPagado),
-    pagada: totalPagado >= totalOrden - 0.01,
+    totalOrden,
+    totalPagado:  parseFloat(totalPagado.toFixed(2)),
+    restante:     parseFloat(Math.max(0, totalOrden - totalPagado).toFixed(2)),
+    pagada:       totalPagado >= totalOrden - 0.01,
   }
 }
 
-// ─── Obtener órdenes pendientes de pago ──────────────────────────────────────
+// ─── Órdenes pendientes de pago ───────────────────────────────────────────────
+// Solo trae las que tienen saldo restante — filtra las ya pagadas en memoria
+// para no requerir una columna extra en BD.
 export const getOrdenesPendientesPago = async () => {
-  return await prisma.ordenes.findMany({
+  const ordenes = await prisma.ordenes.findMany({
     where: {
-      estado: { in: ['pendiente', 'en_preparacion', 'lista', 'entregada'] }
+      estado: { in: ['pendiente', 'en_preparacion', 'lista', 'entregada'] },
     },
     include: {
       pagos: true,
       orden_detalles: {
-        include: {
-          productos: { select: { nombre: true } }
-        }
+        include: { productos: { select: { nombre: true } } },
       },
       orden_combos: {
-        include: {
-          combos: { select: { nombre: true } }
-        }
-      }
+        include: { combos: { select: { nombre: true } } },
+      },
     },
-    orderBy: { creado_en: 'asc' }
+    orderBy: { creado_en: 'asc' },
   })
+
+  // Enriquecer con info de pago y filtrar las completamente pagadas
+  return ordenes
+    .map((orden) => {
+      const totalOrden  = toNum(orden.total)
+      const totalPagado = orden.pagos.reduce((sum, p) => sum + toNum(p.monto), 0)
+      const restante    = parseFloat(Math.max(0, totalOrden - totalPagado).toFixed(2))
+      return { ...orden, totalPagado: parseFloat(totalPagado.toFixed(2)), restante, pagada: restante === 0 }
+    })
+    .filter((o) => !o.pagada)
 }
