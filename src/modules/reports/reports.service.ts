@@ -7,6 +7,21 @@ interface FiltroReporte {
   servicioId?: number
 }
 
+// ─── Helpers de fecha (Hermosillo = UTC-7, sin DST) ──────────────────────────
+const TZ = 'America/Hermosillo'
+
+/**
+ * Recibe un string "YYYY-MM-DD" (ya en hora local Hermosillo) y devuelve
+ * el instante UTC equivalente a las 00:00:00 de ese día en Hermosillo.
+ */
+const inicioDia = (fecha: string): Date => {
+  return new Date(`${fecha}T00:00:00-07:00`)
+}
+
+const finDia = (fecha: string): Date => {
+  return new Date(`${fecha}T23:59:59.999-07:00`)
+}
+
 // ─── Reporte de ventas ────────────────────────────────────────────────────────
 export const getReporteVentas = async (filtros: FiltroReporte) => {
   const where: any = {
@@ -16,14 +31,14 @@ export const getReporteVentas = async (filtros: FiltroReporte) => {
   if (filtros.fechaInicio || filtros.fechaFin) {
     where.creado_en = {}
     if (filtros.fechaInicio) {
-      const inicio = new Date(filtros.fechaInicio)
-      inicio.setHours(0, 0, 0, 0)
-      where.creado_en.gte = inicio
+      const fechaStr = new Date(filtros.fechaInicio)
+        .toLocaleDateString('en-CA', { timeZone: TZ })
+      where.creado_en.gte = inicioDia(fechaStr)
     }
     if (filtros.fechaFin) {
-      const fin = new Date(filtros.fechaFin)
-      fin.setHours(23, 59, 59, 999)
-      where.creado_en.lte = fin
+      const fechaStr = new Date(filtros.fechaFin)
+        .toLocaleDateString('en-CA', { timeZone: TZ })
+      where.creado_en.lte = finDia(fechaStr)
     }
   }
 
@@ -54,11 +69,18 @@ export const getReporteVentas = async (filtros: FiltroReporte) => {
   })
 
   // ── A. Resumen ejecutivo ──────────────────────────────────────────────────
-  const totalVentas = ordenes.reduce(
+  // totalFacturado = suma de totales de todas las órdenes (lo que se debe cobrar)
+  const totalFacturado = ordenes.reduce(
     (sum, o) => sum + parseFloat(o.total?.toString() ?? '0'), 0
   )
+  // totalCobrado = dinero que realmente entró (suma de pagos registrados)
+  const totalCobrado = ordenes.reduce(
+    (sum, o) => sum + o.pagos.reduce(
+      (s, p) => s + parseFloat(p.monto.toString()), 0
+    ), 0
+  )
   const totalOrdenes = ordenes.length
-  const ticketPromedio = totalOrdenes > 0 ? totalVentas / totalOrdenes : 0
+  const ticketPromedio = totalOrdenes > 0 ? totalFacturado / totalOrdenes : 0
 
   // ── B. Ventas por método de pago ──────────────────────────────────────────
   const ventasPorMetodo: Record<string, number> = {}
@@ -111,11 +133,15 @@ export const getReporteVentas = async (filtros: FiltroReporte) => {
 
   return {
     resumen: {
-      totalVentas: parseFloat(totalVentas.toFixed(2)),
+      totalFacturado: parseFloat(totalFacturado.toFixed(2)),
+      totalCobrado: parseFloat(totalCobrado.toFixed(2)),
+      porCobrar: parseFloat((totalFacturado - totalCobrado).toFixed(2)),
       totalOrdenes,
       ticketPromedio: parseFloat(ticketPromedio.toFixed(2)),
-      ordenesCompletadas: ordenes.filter((o) => o.estado === 'entregada').length,
-      ordenesPendientes: ordenes.filter((o) => o.estado !== 'entregada').length,
+      ordenesEntregadas: ordenes.filter((o) => o.estado === 'entregada').length,
+      ordenesListas: ordenes.filter((o) => o.estado === 'lista').length,
+      ordenesEnPreparacion: ordenes.filter((o) => o.estado === 'en_preparacion').length,
+      ordenesPendientes: ordenes.filter((o) => o.estado === 'pendiente').length,
     },
     ventasPorMetodoPago: ventasPorMetodo,
     topProductos,
