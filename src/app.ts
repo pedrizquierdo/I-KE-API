@@ -10,6 +10,7 @@ import { paymentsRoutes } from './modules/payments/payments.routes'
 import { usersRoutes } from './modules/users/users.routes'
 import { menuAdminRoutes } from './modules/menu-admin/menu-admin.routes'
 import { inventoryRoutes } from './modules/inventory/inventory.routes'
+import { reportsRoutes } from './modules/reports/reports.routes'
 
 
 
@@ -38,7 +39,7 @@ app.use('/payments', paymentsRoutes)
 app.use('/users', usersRoutes)
 app.use('/admin/menu', menuAdminRoutes)
 app.use('/inventory', inventoryRoutes)
-
+app.use('/reports', reportsRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'I KE APP backend corriendo' })
