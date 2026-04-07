@@ -30,8 +30,14 @@ export const getReporteVentas = async (filtros: FiltroReporte) => {
 
   if (filtros.fechaInicio || filtros.fechaFin) {
     where.creado_en = {}
-    if (filtros.fechaInicio) where.creado_en.gte = inicioDia(filtros.fechaInicio)
-    if (filtros.fechaFin)    where.creado_en.lte = finDia(filtros.fechaFin)
+    if (filtros.fechaInicio) {
+      const gte = inicioDia(filtros.fechaInicio)
+      where.creado_en.gte = gte
+    }
+    if (filtros.fechaFin) {
+      const lte = finDia(filtros.fechaFin)
+      where.creado_en.lte = lte
+    }
   }
 
   if (filtros.servicioId) where.servicio_id = filtros.servicioId

@@ -3,6 +3,7 @@ import {
   getReporteVentasController,
   getDashboardController,
 } from './reports.controller'
+import { getReporteVentas } from './reports.service'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 
 const router = Router()
@@ -12,12 +13,14 @@ const soloAdmin = [verificarToken, verificarRol('gerente')]
 // Dashboard del día
 router.get('/dashboard', ...soloAdmin, getDashboardController)
 
-// Reporte del día actual (Hermosillo)
 router.get('/sales/today', ...soloAdmin, async (req, res) => {
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Hermosillo' })
-  req.query['fechaInicio'] = hoy
-  req.query['fechaFin'] = hoy
-  getReporteVentasController(req, res)
+  try {
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Hermosillo' })
+    const reporte = await getReporteVentas({ fechaInicio: hoy, fechaFin: hoy })
+    res.json(reporte)
+  } catch (error) {
+    res.status(500).json({ error: 'Error al generar reporte del día' })
+  }
 })
 
 // Reporte de ventas con filtros opcionales
