@@ -6,12 +6,8 @@ export const getReporteVentasController = async (req: Request, res: Response) =>
     const { fechaInicio, fechaFin, servicioId } = req.query
 
     const filtros = {
-      fechaInicio: fechaInicio
-        ? new Date(fechaInicio as string)
-        : undefined,
-      fechaFin: fechaFin
-        ? new Date(fechaFin as string)
-        : undefined,
+      fechaInicio: fechaInicio as string | undefined,
+      fechaFin: fechaFin as string | undefined,
       servicioId: servicioId ? parseInt(servicioId as string) : undefined,
     }
 

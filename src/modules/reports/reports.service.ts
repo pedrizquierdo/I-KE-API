@@ -2,8 +2,8 @@ import { prisma } from '../../config/db'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface FiltroReporte {
-  fechaInicio?: Date
-  fechaFin?: Date
+  fechaInicio?: string   // "YYYY-MM-DD" en hora local Hermosillo
+  fechaFin?: string      // "YYYY-MM-DD" en hora local Hermosillo
   servicioId?: number
 }
 
@@ -30,16 +30,8 @@ export const getReporteVentas = async (filtros: FiltroReporte) => {
 
   if (filtros.fechaInicio || filtros.fechaFin) {
     where.creado_en = {}
-    if (filtros.fechaInicio) {
-      const fechaStr = new Date(filtros.fechaInicio)
-        .toLocaleDateString('en-CA', { timeZone: TZ })
-      where.creado_en.gte = inicioDia(fechaStr)
-    }
-    if (filtros.fechaFin) {
-      const fechaStr = new Date(filtros.fechaFin)
-        .toLocaleDateString('en-CA', { timeZone: TZ })
-      where.creado_en.lte = finDia(fechaStr)
-    }
+    if (filtros.fechaInicio) where.creado_en.gte = inicioDia(filtros.fechaInicio)
+    if (filtros.fechaFin)    where.creado_en.lte = finDia(filtros.fechaFin)
   }
 
   if (filtros.servicioId) where.servicio_id = filtros.servicioId
