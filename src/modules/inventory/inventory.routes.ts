@@ -11,27 +11,34 @@ import {
   crearRecetaController,
 } from './inventory.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { validate } from '../../middlewares/validate.middleware'
+import {
+  CrearIngredienteSchema,
+  ActualizarIngredienteSchema,
+  RegistrarMovimientoSchema,
+  CrearRecetaSchema,
+} from '../../schemas'
 
 const router = Router()
 
-const soloAdmin = [verificarToken, verificarRol('gerente')]
-const empleados = [verificarToken, verificarRol('gerente', 'cajero', 'cocinero')]
+const soloGerente  = [verificarToken, verificarRol('gerente')]
+const staffCocina  = [verificarToken, verificarRol('gerente', 'cocinero')]
 
 // Unidades de medida
-router.get('/units', ...empleados, getUnidadesMedidaController)
+router.get('/unidades', verificarToken, getUnidadesMedidaController)
 
 // Ingredientes
-router.get('/ingredients', ...empleados, getIngredientesController)
-router.get('/ingredients/alerts', ...empleados, getAlertasStockController)
-router.post('/ingredients', ...soloAdmin, crearIngredienteController)
-router.patch('/ingredients/:id', ...soloAdmin, actualizarIngredienteController)
+router.get('/',        ...staffCocina, getIngredientesController)
+router.get('/alertas', ...staffCocina, getAlertasStockController)
+router.post('/',       ...soloGerente, validate(CrearIngredienteSchema),     crearIngredienteController)
+router.patch('/:id',   ...soloGerente, validate(ActualizarIngredienteSchema), actualizarIngredienteController)
 
 // Movimientos
-router.get('/movements', ...soloAdmin, getMovimientosController)
-router.post('/movements', ...soloAdmin, registrarMovimientoController)
+router.get('/movimientos',   ...staffCocina, getMovimientosController)
+router.post('/movimientos',  ...staffCocina, validate(RegistrarMovimientoSchema), registrarMovimientoController)
 
 // Recetas
-router.get('/recipes/product/:id', ...soloAdmin, getRecetasByProductoController)
-router.post('/recipes', ...soloAdmin, crearRecetaController)
+router.get('/recetas/:id',   ...staffCocina, getRecetasByProductoController)
+router.post('/recetas',      ...soloGerente, validate(CrearRecetaSchema), crearRecetaController)
 
 export { router as inventoryRoutes }

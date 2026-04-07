@@ -6,19 +6,16 @@ import {
   getOrdenesPendientesPagoController,
 } from './payments.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { validate } from '../../middlewares/validate.middleware'
+import { ProcesarPagoSchema } from '../../schemas'
 
 const router = Router()
 
-// Métodos de pago disponibles
-router.get('/methods', verificarToken, getMetodosPagoController)
+const soloCajero = [verificarToken, verificarRol('gerente', 'cajero')]
 
-// Órdenes pendientes de pago — cajero y gerente
-router.get('/pending-orders', verificarToken, verificarRol('gerente', 'cajero'), getOrdenesPendientesPagoController)
-
-// Pagos de una orden específica
-router.get('/order/:id', verificarToken, verificarRol('gerente', 'cajero'), getPagosByOrdenController)
-
-// Procesar pago — cajero y gerente
-router.post('/', verificarToken, verificarRol('gerente', 'cajero'), procesarPagoController)
+router.get('/metodos',           ...soloCajero, getMetodosPagoController)
+router.get('/pendientes',        ...soloCajero, getOrdenesPendientesPagoController)
+router.get('/orden/:id',         ...soloCajero, getPagosByOrdenController)
+router.post('/',  ...soloCajero, validate(ProcesarPagoSchema), procesarPagoController)
 
 export { router as paymentsRoutes }

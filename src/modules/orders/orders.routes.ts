@@ -7,23 +7,43 @@ import {
   getOrdenesByUsuarioController,
 } from './orders.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { validate } from '../../middlewares/validate.middleware'
+import { CrearOrdenSchema, CambiarEstadoOrdenSchema } from '../../schemas'
 
 const router = Router()
 
-// Crear orden — cualquier usuario autenticado
-router.post('/', verificarToken, crearOrdenController)
+// Crear orden — cualquier usuario autenticado (o anónimo para pedidos de mostrador)
+router.post('/',
+  validate(CrearOrdenSchema),
+  crearOrdenController,
+)
 
-// Ver órdenes — solo empleados
-router.get('/', verificarToken, verificarRol('gerente', 'cajero', 'cocinero', 'repartidor'), getOrdenesController)
+// Ver todas las órdenes activas — solo staff
+router.get('/',
+  verificarToken,
+  verificarRol('gerente', 'cajero', 'cocinero', 'mesero'),
+  getOrdenesController,
+)
 
-router.get('/my', verificarToken, getOrdenesByUsuarioController)
+// Ver mis pedidos — usuario autenticado
+router.get('/mis-pedidos',
+  verificarToken,
+  getOrdenesByUsuarioController,
+)
 
-// Ver orden específica — cualquier autenticado
-router.get('/:id', verificarToken, getOrdenByIdController)
+// Ver orden por ID — solo staff
+router.get('/:id',
+  verificarToken,
+  verificarRol('gerente', 'cajero', 'cocinero', 'mesero'),
+  getOrdenByIdController,
+)
 
-// Cambiar estado — solo empleados
-router.patch('/:id/status', verificarToken, verificarRol('gerente', 'cajero', 'cocinero', 'repartidor'), cambiarEstadoOrdenController)
-
-
+// Cambiar estado — solo staff de cocina/servicio
+router.patch('/:id/status',
+  verificarToken,
+  verificarRol('gerente', 'cajero', 'cocinero', 'mesero'),
+  validate(CambiarEstadoOrdenSchema),
+  cambiarEstadoOrdenController,
+)
 
 export { router as ordersRoutes }

@@ -6,19 +6,25 @@ import {
   logoutController,
   meController,
 } from './auth.controller'
-import { verificarToken } from '../../middlewares/auth.middleware'
+import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { validate } from '../../middlewares/validate.middleware'
+import { authLimiter } from '../../middlewares/rate-limit.middleware'
+import { LoginSchema, RegistrarSchema } from '../../schemas'
 
 const router = Router()
 
-// Públicas
-router.post('/login', loginController)
-router.post('/refresh', refreshController)
-router.post('/logout', logoutController)
+// Rate limiter aplicado solo a los endpoints que reciben credenciales
+router.post('/login',    authLimiter, validate(LoginSchema),    loginController)
+router.post('/refresh',  authLimiter,                           refreshController)
+router.post('/logout',                                          logoutController)
+router.get('/me',        verificarToken,                        meController)
 
-// Protegidas — requieren token válido
-router.get('/me', verificarToken, meController)
-
-// Solo admin puede registrar usuarios
-router.post('/register', verificarToken, registrarController)
+// Solo gerente puede registrar nuevos usuarios
+router.post('/register',
+  verificarToken,
+  verificarRol('gerente'),
+  validate(RegistrarSchema),
+  registrarController,
+)
 
 export { router as authRoutes }

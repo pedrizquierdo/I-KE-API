@@ -6,13 +6,16 @@ import {
   desactivarUsuarioController,
 } from './users.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { validate } from '../../middlewares/validate.middleware'
+import { ActualizarUsuarioSchema } from '../../schemas'
 
 const router = Router()
 
-// Solo gerente puede gestionar usuarios
-router.get('/', verificarToken, verificarRol('gerente'), getUsuariosController)
-router.get('/:id', verificarToken, verificarRol('gerente'), getUsuarioByIdController)
-router.patch('/:id', verificarToken, verificarRol('gerente'), actualizarUsuarioController)
-router.delete('/:id', verificarToken, verificarRol('gerente'), desactivarUsuarioController)
+const soloGerente = [verificarToken, verificarRol('gerente')]
+
+router.get('/',         ...soloGerente,                                      getUsuariosController)
+router.get('/:id',      ...soloGerente,                                      getUsuarioByIdController)
+router.patch('/:id',    ...soloGerente, validate(ActualizarUsuarioSchema),   actualizarUsuarioController)
+router.delete('/:id',   ...soloGerente,                                      desactivarUsuarioController)
 
 export { router as usersRoutes }
