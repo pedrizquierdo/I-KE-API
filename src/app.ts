@@ -9,6 +9,8 @@ import { ordersRoutes } from './modules/orders/orders.routes'
 import { paymentsRoutes } from './modules/payments/payments.routes'
 import { usersRoutes } from './modules/users/users.routes'
 import { menuAdminRoutes } from './modules/menu-admin/menu-admin.routes'
+import { inventoryRoutes } from './modules/inventory/inventory.routes'
+
 
 
 dotenv.config()
@@ -35,7 +37,7 @@ app.use('/orders', ordersRoutes)
 app.use('/payments', paymentsRoutes)
 app.use('/users', usersRoutes)
 app.use('/admin/menu', menuAdminRoutes)
-
+app.use('/inventory', inventoryRoutes)
 
 
 app.get('/health', (_req, res) => {
