@@ -7,10 +7,11 @@ import {
   getOrdenesByUsuarioController,
   getOrdenesDeliveryController,
   editarItemsOrdenController,
+  actualizarTiempoEstimadoController,
 } from './orders.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
-import { CrearOrdenSchema, CambiarEstadoOrdenSchema, ActualizarItemsOrdenSchema } from '../../schemas'
+import { CrearOrdenSchema, CambiarEstadoOrdenSchema, ActualizarItemsOrdenSchema, ActualizarTiempoEstimadoSchema } from '../../schemas'
 
 const router = Router()
 
@@ -54,6 +55,14 @@ router.patch('/:id/items',
   verificarRol('gerente', 'cajero', 'mesero'),
   validate(ActualizarItemsOrdenSchema),
   editarItemsOrdenController,
+)
+
+// Tiempo estimado — solo el cocinero puede indicarlo
+router.patch('/:id/estimated-time',
+  verificarToken,
+  verificarRol('cocinero'),
+  validate(ActualizarTiempoEstimadoSchema),
+  actualizarTiempoEstimadoController,
 )
 
 // Cambiar estado — solo staff de cocina/servicio

@@ -220,6 +220,33 @@ export const cambiarEstadoOrden = async (
   return ordenActualizada
 }
 
+// ─── Actualizar tiempo estimado (solo cocinero) ───────────────────────────────
+// Solo válido mientras la orden está activa (pendiente / en_preparacion).
+// Pasar null limpia el estimado (p.ej. si el cocinero se equivocó).
+export const actualizarTiempoEstimado = async (
+  id: number,
+  tiempoEstimadoMinutos: number | null,
+) => {
+  const orden = await prisma.ordenes.findUnique({ where: { id } })
+  if (!orden) throw new AppError(404, 'Orden no encontrada')
+
+  if (!['pendiente', 'en_preparacion'].includes(orden.estado)) {
+    throw new AppError(
+      422,
+      `No se puede actualizar el tiempo estimado de una orden en estado "${orden.estado}". ` +
+      'Solo se permite en "pendiente" o "en_preparacion".',
+    )
+  }
+
+  await prisma.ordenes.update({
+    where: { id },
+    data:  { tiempo_estimado_minutos: tiempoEstimadoMinutos, actualizado_en: new Date() },
+  })
+
+  // Devuelve la vista completa para que el WebSocket la reenvíe a cocina y al cliente
+  return getOrdenById(id)
+}
+
 // ─── Editar items de una orden ────────────────────────────────────────────────
 interface EditarItemsOrdenDTO {
   productos?: { productoId: number; cantidad: number; notas?: string }[]
@@ -420,17 +447,18 @@ export const getOrdenesDelivery = async (pagination?: PaginationParams) => {
     prisma.ordenes.findMany({
       where,
       select: {
-        id:                true,
-        numero:            true,
-        estado:            true,
-        nombre_cliente:    true,
-        direccion_entrega: true,
-        telefono_cliente:  true,
-        subtotal:          true,
-        total:             true,
-        notas_orden:       true,
-        creado_en:         true,
-        actualizado_en:    true,
+        id:                      true,
+        numero:                  true,
+        estado:                  true,
+        nombre_cliente:          true,
+        direccion_entrega:       true,
+        telefono_cliente:        true,
+        subtotal:                true,
+        total:                   true,
+        notas_orden:             true,
+        tiempo_estimado_minutos: true,
+        creado_en:               true,
+        actualizado_en:          true,
         orden_detalles: {
           include: { productos: { select: { id: true, nombre: true } } },
         },

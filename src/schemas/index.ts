@@ -82,6 +82,16 @@ export const CambiarEstadoOrdenSchema = z.object({
   }),
 })
 
+export const ActualizarTiempoEstimadoSchema = z.object({
+  // null permite limpiar el estimado cuando ya no aplica
+  tiempoEstimadoMinutos: z
+    .number()
+    .int('Debe ser un número entero de minutos')
+    .min(1,   'El tiempo mínimo es 1 minuto')
+    .max(480, 'El tiempo máximo es 480 minutos (8 horas)')
+    .nullable(),
+})
+
 // Cada item lleva su productoId/comboId + la cantidad deseada.
 // cantidad > 0 → agregar si no existe, actualizar si ya existe.
 // cantidad = 0 → eliminar (solo permitido en estado 'pendiente').

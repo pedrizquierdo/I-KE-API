@@ -199,6 +199,7 @@ model ordenes {
   tipo_servicio           String                    @default("mostrador") @db.VarChar(20)
   nombre_cliente          String?                   @db.VarChar(150)
   notas_orden             String?
+  tiempo_estimado_minutos Int?
   promocion_id            Int?
   direccion_entrega       String?                   @db.VarChar(300)
   telefono_cliente        String?                   @db.VarChar(20)
