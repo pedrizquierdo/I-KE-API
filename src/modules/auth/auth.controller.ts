@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { login, refresh, registrar } from './auth.service'
+import { login, refresh, registrar, solicitarResetPassword, resetPassword } from './auth.service'
 import { AppError } from '../../lib/AppError'
 
 // Express 5 captura automáticamente los rechazos de promesas y los pasa al middleware de error.
@@ -48,4 +48,17 @@ export const logoutController = (_req: Request, res: Response) => {
 
 export const meController = (req: Request, res: Response) => {
   res.json((req as any).usuario)
+}
+
+export const forgotPasswordController = async (req: Request, res: Response) => {
+  const { email } = req.body
+  // El servicio nunca lanza error si el email no existe — respuesta siempre genérica
+  await solicitarResetPassword(email)
+  res.json({ message: 'Si el correo está registrado recibirás un enlace en breve' })
+}
+
+export const resetPasswordController = async (req: Request, res: Response) => {
+  const { token, password } = req.body
+  await resetPassword(token, password)
+  res.json({ message: 'Contraseña actualizada correctamente' })
 }

@@ -16,10 +16,13 @@ interface ComboOrden {
 }
 
 interface CrearOrdenDTO {
+  tipoServicio?: 'mostrador' | 'domicilio' | 'evento'
   productos?: ProductoOrden[]
   combos?: ComboOrden[]
   notas?: string
   nombreCliente?: string
+  direccionEntrega?: string
+  telefonoCliente?: string
 }
 
 export interface PaginationParams {
@@ -87,10 +90,13 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
   const [orden] = await prisma.$transaction([
     prisma.ordenes.create({
       data: {
-        servicio_id:    servicio.id,
-        usuario_id:     usuarioId ?? null,
-        nombre_cliente: datos.nombreCliente ?? null,
-        notas_orden:    datos.notas ?? null,
+        servicio_id:       servicio.id,
+        usuario_id:        usuarioId ?? null,
+        tipo_servicio:     datos.tipoServicio ?? 'mostrador',
+        nombre_cliente:    datos.nombreCliente ?? null,
+        notas_orden:       datos.notas ?? null,
+        direccion_entrega: datos.direccionEntrega ?? null,
+        telefono_cliente:  datos.telefonoCliente ?? null,
         subtotal,
         descuento: 0,
         estado: 'pendiente',
@@ -212,6 +218,54 @@ export const cambiarEstadoOrden = async (
   ])
 
   return ordenActualizada
+}
+
+// ─── Órdenes de domicilio (vista del repartidor) ─────────────────────────────
+// Muestra todas las órdenes de tipo 'domicilio' en estados activos.
+// El repartidor ve la cola completa; la asignación individual se gestiona
+// mediante PATCH /:id/status cuando toma una orden.
+const ESTADOS_ACTIVOS_DELIVERY = ['pendiente', 'en_preparacion', 'lista']
+
+export const getOrdenesDelivery = async (pagination?: PaginationParams) => {
+  const page  = Math.max(1, pagination?.page ?? 1)
+  const limit = Math.min(100, Math.max(1, pagination?.limit ?? 50))
+  const skip  = (page - 1) * limit
+
+  const where = {
+    tipo_servicio: 'domicilio',
+    estado: { in: ESTADOS_ACTIVOS_DELIVERY },
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.ordenes.findMany({
+      where,
+      select: {
+        id:                true,
+        numero:            true,
+        estado:            true,
+        nombre_cliente:    true,
+        direccion_entrega: true,
+        telefono_cliente:  true,
+        subtotal:          true,
+        total:             true,
+        notas_orden:       true,
+        creado_en:         true,
+        actualizado_en:    true,
+        orden_detalles: {
+          include: { productos: { select: { id: true, nombre: true } } },
+        },
+        orden_combos: {
+          include: { combos: { select: { id: true, nombre: true } } },
+        },
+      },
+      orderBy: { creado_en: 'asc' }, // más antiguas primero → prioridad de entrega
+      skip,
+      take: limit,
+    }),
+    prisma.ordenes.count({ where }),
+  ])
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
 // ─── Órdenes por usuario ──────────────────────────────────────────────────────

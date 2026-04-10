@@ -5,6 +5,7 @@ import {
   getOrdenByIdController,
   cambiarEstadoOrdenController,
   getOrdenesByUsuarioController,
+  getOrdenesDeliveryController,
 } from './orders.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
@@ -29,6 +30,14 @@ router.get('/',
 router.get('/mis-pedidos',
   verificarToken,
   getOrdenesByUsuarioController,
+)
+
+// Cola de domicilios — repartidor y gerente
+// IMPORTANTE: debe estar antes de '/:id' para que Express no lo interprete como un ID
+router.get('/delivery',
+  verificarToken,
+  verificarRol('repartidor', 'gerente', 'cajero'),
+  getOrdenesDeliveryController,
 )
 
 // Ver orden por ID — solo staff

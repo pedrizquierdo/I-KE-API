@@ -1,7 +1,10 @@
+import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../config/db'
 import { AppError } from '../../lib/AppError'
+import { enviarEmailResetPassword } from '../../lib/mailer'
+import { env } from '../../config/env'
 
 const JWT_SECRET = process.env.JWT_SECRET as string
 const JWT_SECRET_REFRESH = process.env.JWT_SECRET_REFRESH as string
@@ -86,6 +89,61 @@ export const refresh = async (refreshToken: string) => {
     if (err instanceof AppError) throw err
     throw new AppError(401, 'Refresh token inválido o expirado')
   }
+}
+
+// ─── Recuperación de contraseña ───────────────────────────────────────────────
+export const solicitarResetPassword = async (email: string) => {
+  // Respuesta genérica siempre — nunca revelar si el email existe o no
+  const usuario = await prisma.usuarios.findUnique({ where: { email } })
+  if (!usuario || !usuario.activo) return
+
+  // Invalidar tokens previos pendientes del mismo usuario
+  await prisma.password_reset_tokens.updateMany({
+    where: { usuario_id: usuario.id, usado: false },
+    data: { usado: true },
+  })
+
+  // Generar token criptográficamente seguro (32 bytes → 64 chars hex)
+  const tokenPlano = crypto.randomBytes(32).toString('hex')
+  // Almacenar solo el hash SHA-256 — si la BD es comprometida, el token plano no se expone
+  const tokenHash = crypto.createHash('sha256').update(tokenPlano).digest('hex')
+
+  await prisma.password_reset_tokens.create({
+    data: {
+      usuario_id: usuario.id,
+      token_hash: tokenHash,
+      expira_en: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
+    },
+  })
+
+  const resetUrl = `${env.APP_URL}/reset-password?token=${tokenPlano}`
+  await enviarEmailResetPassword(usuario.email, resetUrl)
+}
+
+export const resetPassword = async (tokenPlano: string, nuevaPassword: string) => {
+  const tokenHash = crypto.createHash('sha256').update(tokenPlano).digest('hex')
+
+  const registro = await prisma.password_reset_tokens.findUnique({
+    where: { token_hash: tokenHash },
+  })
+
+  if (!registro || registro.usado || registro.expira_en < new Date()) {
+    throw new AppError(400, 'El token es inválido o ha expirado')
+  }
+
+  const hash = await bcrypt.hash(nuevaPassword, 12)
+
+  // Actualizar contraseña y marcar token como usado en una transacción
+  await prisma.$transaction([
+    prisma.usuarios.update({
+      where: { id: registro.usuario_id },
+      data: { password: hash },
+    }),
+    prisma.password_reset_tokens.update({
+      where: { id: registro.id },
+      data: { usado: true },
+    }),
+  ])
 }
 
 // ─── Registrar usuario (solo admin) ──────────────────────────────────────────

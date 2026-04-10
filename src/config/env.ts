@@ -15,6 +15,13 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME es requerida'),
   CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY es requerida'),
   CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET es requerida'),
+  // Nodemailer / SMTP
+  SMTP_HOST: z.string().min(1, 'SMTP_HOST es requerido'),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().min(1, 'SMTP_USER es requerido'),
+  SMTP_PASS: z.string().min(1, 'SMTP_PASS es requerido'),
+  SMTP_FROM: z.string().min(1, 'SMTP_FROM es requerido'),
+  APP_URL: z.string().url().default('http://localhost:3001'),
 })
 
 const result = envSchema.safeParse(process.env)

@@ -3,17 +3,29 @@ import { z } from 'zod'
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────────────────────────────────────
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email('Email inválido'),
+})
+
+export const ResetPasswordSchema = z.object({
+  token:    z.string().min(1, 'Token requerido'),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+})
+
 export const LoginSchema = z.object({
   email:    z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
 })
 
+export const RolSchema = z.enum(
+  ['gerente', 'cajero', 'cocinero', 'mesero', 'repartidor'],
+  { message: 'Rol inválido' }
+)
+
 export const RegistrarSchema = z.object({
   email:      z.string().email('Email inválido'),
   password:   z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-  rol:        z.enum(['gerente', 'cajero', 'cocinero', 'mesero'], {
-    message: 'Rol inválido',
-  }),
+  rol:        RolSchema,
   empleadoId: z.number().int().positive().optional(),
 })
 
@@ -32,14 +44,37 @@ const ComboOrdenSchema = z.object({
 })
 
 export const CrearOrdenSchema = z.object({
-  productos:     z.array(ProductoOrdenSchema).optional(),
-  combos:        z.array(ComboOrdenSchema).optional(),
-  notas:         z.string().max(500).optional(),
-  nombreCliente: z.string().min(1).max(100).optional(),
-}).refine(
-  (data) => (data.productos?.length ?? 0) + (data.combos?.length ?? 0) > 0,
-  { message: 'La orden debe tener al menos un producto o combo' }
-)
+  tipoServicio:     z.enum(['mostrador', 'domicilio', 'evento']).default('mostrador'),
+  productos:        z.array(ProductoOrdenSchema).optional(),
+  combos:           z.array(ComboOrdenSchema).optional(),
+  notas:            z.string().max(500).optional(),
+  nombreCliente:    z.string().min(1).max(100).optional(),
+  direccionEntrega: z.string().min(5).max(300).optional(),
+  telefonoCliente:  z.string().min(7).max(20).optional(),
+}).superRefine((data, ctx) => {
+  if ((data.productos?.length ?? 0) + (data.combos?.length ?? 0) === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'La orden debe tener al menos un producto o combo',
+    })
+  }
+  if (data.tipoServicio === 'domicilio') {
+    if (!data.direccionEntrega) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['direccionEntrega'],
+        message: 'La dirección de entrega es requerida para pedidos a domicilio',
+      })
+    }
+    if (!data.telefonoCliente) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['telefonoCliente'],
+        message: 'El teléfono del cliente es requerido para pedidos a domicilio',
+      })
+    }
+  }
+})
 
 export const CambiarEstadoOrdenSchema = z.object({
   estado: z.enum(['pendiente', 'en_preparacion', 'lista', 'entregada', 'cancelada'], {
@@ -167,7 +202,7 @@ export const CrearRecetaSchema = z.object({
 // USERS
 // ─────────────────────────────────────────────────────────────────────────────
 export const ActualizarUsuarioSchema = z.object({
-  rol:        z.enum(['gerente', 'cajero', 'cocinero', 'mesero']).optional(),
+  rol:        RolSchema.optional(),
   activo:     z.boolean().optional(),
   password:   z.string().min(6).optional(),
   empleadoId: z.number().int().positive().optional(),

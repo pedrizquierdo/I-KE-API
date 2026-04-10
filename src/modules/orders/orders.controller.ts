@@ -1,11 +1,14 @@
 import { Request, Response } from 'express'
-import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden, getOrdenesByUsuario } from './orders.service'
+import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden, getOrdenesByUsuario, getOrdenesDelivery } from './orders.service'
 import { AppError } from '../../lib/AppError'
 import { getIo } from '../../lib/socket'
 
 export const crearOrdenController = async (req: Request, res: Response) => {
-  const { productos, combos, notas, nombreCliente } = req.body
-  const orden = await crearOrden({ productos, combos, notas, nombreCliente }, req.usuario?.id)
+  const { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, telefonoCliente } = req.body
+  const orden = await crearOrden(
+    { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, telefonoCliente },
+    req.usuario?.id,
+  )
 
   // Notificar a la pantalla de cocina vía WebSocket
   getIo().to('cocina').emit('orden:nueva', { id: orden.id, estado: orden.estado, orden })
@@ -38,6 +41,13 @@ export const cambiarEstadoOrdenController = async (req: Request, res: Response) 
   getIo().to('cocina').emit('orden:estado', { id: orden.id, estado: orden.estado, orden })
 
   res.json(orden)
+}
+
+export const getOrdenesDeliveryController = async (req: Request, res: Response) => {
+  const page  = req.query['page']  ? parseInt(req.query['page']  as string) : undefined
+  const limit = req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
+  const result = await getOrdenesDelivery({ page, limit })
+  res.json(result)
 }
 
 export const getOrdenesByUsuarioController = async (req: Request, res: Response) => {
