@@ -1,5 +1,6 @@
 import { prisma } from '../../config/db'
 import bcrypt from 'bcryptjs'
+import { AppError } from '../../lib/AppError'
 
 // ─── Obtener todos los usuarios ───────────────────────────────────────────────
 export const getUsuarios = async () => {
@@ -34,7 +35,7 @@ export const getUsuarioById = async (id: number) => {
     }
   })
 
-  if (!usuario) throw new Error('Usuario no encontrado')
+  if (!usuario) throw new AppError(404, 'Usuario no encontrado')
   return usuario
 }
 
@@ -44,10 +45,9 @@ export const actualizarUsuario = async (
   datos: { rol?: string; activo?: boolean; password?: string; empleadoId?: number }
 ) => {
   const usuario = await prisma.usuarios.findUnique({ where: { id } })
-  if (!usuario) throw new Error('Usuario no encontrado')
+  if (!usuario) throw new AppError(404, 'Usuario no encontrado')
 
   const dataUpdate: any = {}
-
   if (datos.rol !== undefined) dataUpdate.rol = datos.rol
   if (datos.activo !== undefined) dataUpdate.activo = datos.activo
   if (datos.empleadoId !== undefined) dataUpdate.empleado_id = datos.empleadoId
@@ -73,7 +73,7 @@ export const actualizarUsuario = async (
 // ─── Desactivar usuario (soft delete) ────────────────────────────────────────
 export const desactivarUsuario = async (id: number) => {
   const usuario = await prisma.usuarios.findUnique({ where: { id } })
-  if (!usuario) throw new Error('Usuario no encontrado')
+  if (!usuario) throw new AppError(404, 'Usuario no encontrado')
 
   return await prisma.usuarios.update({
     where: { id },

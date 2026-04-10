@@ -1,4 +1,5 @@
 import { prisma } from '../../config/db'
+import { AppError } from '../../lib/AppError'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface CrearProductoDTO {
@@ -39,7 +40,7 @@ export const crearProducto = async (datos: CrearProductoDTO) => {
   const existe = await prisma.productos.findFirst({
     where: { nombre: datos.nombre, categoria_id: datos.categoriaId }
   })
-  if (existe) throw new Error('Ya existe un producto con ese nombre en esta categoría')
+  if (existe) throw new AppError(409, 'Ya existe un producto con ese nombre en esta categoría')
 
   return await prisma.productos.create({
     data: {
@@ -57,7 +58,7 @@ export const crearProducto = async (datos: CrearProductoDTO) => {
 
 export const actualizarProducto = async (id: number, datos: ActualizarProductoDTO) => {
   const producto = await prisma.productos.findUnique({ where: { id } })
-  if (!producto) throw new Error('Producto no encontrado')
+  if (!producto) throw new AppError(404, 'Producto no encontrado')
 
   return await prisma.productos.update({
     where: { id },
@@ -77,9 +78,8 @@ export const actualizarProducto = async (id: number, datos: ActualizarProductoDT
 
 export const eliminarProducto = async (id: number) => {
   const producto = await prisma.productos.findUnique({ where: { id } })
-  if (!producto) throw new Error('Producto no encontrado')
+  if (!producto) throw new AppError(404, 'Producto no encontrado')
 
-  // Soft delete — marcar como no disponible
   return await prisma.productos.update({
     where: { id },
     data: { disponible: false },
@@ -90,7 +90,7 @@ export const eliminarProducto = async (id: number) => {
 // ─── Categorías ───────────────────────────────────────────────────────────────
 export const crearCategoria = async (nombre: string, descripcion?: string) => {
   const existe = await prisma.categorias.findUnique({ where: { nombre } })
-  if (existe) throw new Error('Ya existe una categoría con ese nombre')
+  if (existe) throw new AppError(409, 'Ya existe una categoría con ese nombre')
 
   return await prisma.categorias.create({
     data: { nombre, descripcion: descripcion ?? null }
@@ -102,7 +102,7 @@ export const actualizarCategoria = async (
   datos: { nombre?: string; descripcion?: string; activo?: boolean }
 ) => {
   const categoria = await prisma.categorias.findUnique({ where: { id } })
-  if (!categoria) throw new Error('Categoría no encontrada')
+  if (!categoria) throw new AppError(404, 'Categoría no encontrada')
 
   return await prisma.categorias.update({
     where: { id },
@@ -117,7 +117,7 @@ export const actualizarCategoria = async (
 // ─── Combos ───────────────────────────────────────────────────────────────────
 export const crearCombo = async (datos: CrearComboDTO) => {
   const existe = await prisma.combos.findFirst({ where: { nombre: datos.nombre } })
-  if (existe) throw new Error('Ya existe un combo con ese nombre')
+  if (existe) throw new AppError(409, 'Ya existe un combo con ese nombre')
 
   return await prisma.combos.create({
     data: {
@@ -144,7 +144,7 @@ export const crearCombo = async (datos: CrearComboDTO) => {
 
 export const actualizarCombo = async (id: number, datos: ActualizarComboDTO) => {
   const combo = await prisma.combos.findUnique({ where: { id } })
-  if (!combo) throw new Error('Combo no encontrado')
+  if (!combo) throw new AppError(404, 'Combo no encontrado')
 
   return await prisma.combos.update({
     where: { id },
@@ -167,7 +167,7 @@ export const actualizarCombo = async (id: number, datos: ActualizarComboDTO) => 
 
 export const eliminarCombo = async (id: number) => {
   const combo = await prisma.combos.findUnique({ where: { id } })
-  if (!combo) throw new Error('Combo no encontrado')
+  if (!combo) throw new AppError(404, 'Combo no encontrado')
 
   return await prisma.combos.update({
     where: { id },

@@ -1,92 +1,51 @@
 import { Request, Response } from 'express'
 import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden, getOrdenesByUsuario } from './orders.service'
-import { prisma } from '../../config/db'
+import { AppError } from '../../lib/AppError'
+import { getIo } from '../../lib/socket'
 
 export const crearOrdenController = async (req: Request, res: Response) => {
-  try {
-    const { productos, combos, notas, nombreCliente } = req.body
+  const { productos, combos, notas, nombreCliente } = req.body
+  const orden = await crearOrden({ productos, combos, notas, nombreCliente }, req.usuario?.id)
 
-    if ((!productos || productos.length === 0) && (!combos || combos.length === 0)) {
-      res.status(400).json({ error: 'La orden debe tener al menos un producto o combo' })
-      return
-    }
+  // Notificar a la pantalla de cocina vía WebSocket
+  getIo().to('cocina').emit('orden:nueva', { id: orden.id, estado: orden.estado, orden })
 
-    const orden = await crearOrden(
-      { productos, combos, notas, nombreCliente },
-      req.usuario?.id  // ← ya estaba, solo verificar que esté
-    )
-
-    res.status(201).json(orden)
-  } catch (error) {
-    const mensaje = error instanceof Error ? error.message : 'Error al crear orden'
-    res.status(400).json({ error: mensaje })
-  }
+  res.status(201).json(orden)
 }
 
-export const getOrdenesController = async (_req: Request, res: Response) => {
-  try {
-    const ordenes = await getOrdenes()
-    res.json(ordenes)
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener órdenes' })
-  }
+export const getOrdenesController = async (req: Request, res: Response) => {
+  const page  = req.query['page']  ? parseInt(req.query['page']  as string) : undefined
+  const limit = req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
+  const result = await getOrdenes({ page, limit })
+  res.json(result)
 }
 
 export const getOrdenByIdController = async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params['id'] as string)
-
-    if (isNaN(id)) {
-      res.status(400).json({ error: 'ID inválido' })
-      return
-    }
-
-    const orden = await getOrdenById(id)
-
-    if (!orden) {
-      res.status(404).json({ error: 'Orden no encontrada' })
-      return
-    }
-
-    res.json(orden)
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener orden' })
-  }
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  const orden = await getOrdenById(id)
+  res.json(orden)
 }
 
 export const cambiarEstadoOrdenController = async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params['id'] as string)
-    const { estado } = req.body
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
 
-    if (isNaN(id)) {
-      res.status(400).json({ error: 'ID inválido' })
-      return
-    }
+  const { estado } = req.body
+  const orden = await cambiarEstadoOrden(id, estado, req.usuario?.id)
 
-    if (!estado) {
-      res.status(400).json({ error: 'El estado es requerido' })
-      return
-    }
+  // Notificar cambio de estado en tiempo real a la pantalla de cocina
+  getIo().to('cocina').emit('orden:estado', { id: orden.id, estado: orden.estado, orden })
 
-    const orden = await cambiarEstadoOrden(id, estado, req.usuario?.id)
-    res.json(orden)
-  } catch (error) {
-    const mensaje = error instanceof Error ? error.message : 'Error al cambiar estado'
-    res.status(400).json({ error: mensaje })
-  }
+  res.json(orden)
 }
 
 export const getOrdenesByUsuarioController = async (req: Request, res: Response) => {
-  try {
-    const usuarioId = req.usuario?.id
-    if (!usuarioId) {
-      res.status(401).json({ error: 'No autenticado' })
-      return
-    }
-    const ordenes = await getOrdenesByUsuario(usuarioId)
-    res.json(ordenes)
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener pedidos' })
-  }
+  const usuarioId = req.usuario?.id
+  if (!usuarioId) throw new AppError(401, 'No autenticado')
+
+  const page  = req.query['page']  ? parseInt(req.query['page']  as string) : undefined
+  const limit = req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
+  const result = await getOrdenesByUsuario(usuarioId, { page, limit })
+  res.json(result)
 }

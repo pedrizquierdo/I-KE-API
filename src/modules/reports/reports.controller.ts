@@ -2,27 +2,16 @@ import { Request, Response } from 'express'
 import { getReporteVentas, getDashboard } from './reports.service'
 
 export const getReporteVentasController = async (req: Request, res: Response) => {
-  try {
-    const { fechaInicio, fechaFin, servicioId } = req.query
-
-    const filtros = {
-      fechaInicio: fechaInicio as string | undefined,
-      fechaFin: fechaFin as string | undefined,
-      servicioId: servicioId ? parseInt(servicioId as string) : undefined,
-    }
-
-    const reporte = await getReporteVentas(filtros)
-    res.json(reporte)
-  } catch (error) {
-    res.status(500).json({ error: 'Error al generar reporte' })
-  }
+  const { fechaInicio, fechaFin, servicioId } = req.query
+  const reporte = await getReporteVentas({
+    fechaInicio: fechaInicio as string | undefined,
+    fechaFin:    fechaFin    as string | undefined,
+    servicioId:  servicioId  ? parseInt(servicioId as string) : undefined,
+  })
+  res.json(reporte)
 }
 
 export const getDashboardController = async (_req: Request, res: Response) => {
-  try {
-    const dashboard = await getDashboard()
-    res.json(dashboard)
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener dashboard' })
-  }
+  const dashboard = await getDashboard()
+  res.json(dashboard)
 }

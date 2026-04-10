@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../config/db'
+import { AppError } from '../../lib/AppError'
 
 const JWT_SECRET = process.env.JWT_SECRET as string
 const JWT_SECRET_REFRESH = process.env.JWT_SECRET_REFRESH as string
@@ -29,7 +30,6 @@ const generarTokens = (payload: TokenPayload) => {
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 export const login = async (email: string, password: string) => {
-  // 1. Buscar usuario
   const usuario = await prisma.usuarios.findUnique({
     where: { email },
     include: {
@@ -39,21 +39,12 @@ export const login = async (email: string, password: string) => {
     }
   })
 
-  if (!usuario) {
-    throw new Error('Credenciales incorrectas')
-  }
+  if (!usuario) throw new AppError(401, 'Credenciales incorrectas')
+  if (!usuario.activo) throw new AppError(401, 'Usuario desactivado')
 
-  if (!usuario.activo) {
-    throw new Error('Usuario desactivado')
-  }
-
-  // 2. Verificar contraseña
   const passwordValida = await bcrypt.compare(password, usuario.password)
-  if (!passwordValida) {
-    throw new Error('Credenciales incorrectas')
-  }
+  if (!passwordValida) throw new AppError(401, 'Credenciales incorrectas')
 
-  // 3. Generar tokens
   const payload: TokenPayload = {
     id: usuario.id,
     email: usuario.email,
@@ -80,14 +71,8 @@ export const refresh = async (refreshToken: string) => {
   try {
     const payload = jwt.verify(refreshToken, JWT_SECRET_REFRESH) as TokenPayload
 
-    // Verificar que el usuario sigue activo
-    const usuario = await prisma.usuarios.findUnique({
-      where: { id: payload.id }
-    })
-
-    if (!usuario || !usuario.activo) {
-      throw new Error('Usuario no válido')
-    }
+    const usuario = await prisma.usuarios.findUnique({ where: { id: payload.id } })
+    if (!usuario || !usuario.activo) throw new AppError(401, 'Usuario no válido')
 
     const nuevoPayload: TokenPayload = {
       id: usuario.id,
@@ -96,10 +81,10 @@ export const refresh = async (refreshToken: string) => {
     }
 
     const { accessToken, refreshToken: nuevoRefreshToken } = generarTokens(nuevoPayload)
-
     return { accessToken, refreshToken: nuevoRefreshToken }
-  } catch {
-    throw new Error('Refresh token inválido o expirado')
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    throw new AppError(401, 'Refresh token inválido o expirado')
   }
 }
 
@@ -110,13 +95,9 @@ export const registrar = async (
   rol: string,
   empleadoId?: number
 ) => {
-  // Verificar si ya existe
   const existe = await prisma.usuarios.findUnique({ where: { email } })
-  if (existe) {
-    throw new Error('El email ya está registrado')
-  }
+  if (existe) throw new AppError(409, 'El email ya está registrado')
 
-  // Encriptar contraseña
   const hash = await bcrypt.hash(password, 12)
 
   const usuario = await prisma.usuarios.create({
@@ -128,9 +109,5 @@ export const registrar = async (
     }
   })
 
-  return {
-    id: usuario.id,
-    email: usuario.email,
-    rol: usuario.rol,
-  }
+  return { id: usuario.id, email: usuario.email, rol: usuario.rol }
 }
