@@ -1,5 +1,6 @@
 import { prisma } from '../../config/db'
 import { AppError } from '../../lib/AppError'
+import { cloudinary } from '../../config/cloudinary'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface CrearProductoDTO {
@@ -74,6 +75,29 @@ export const actualizarProducto = async (id: number, datos: ActualizarProductoDT
       categorias: { select: { id: true, nombre: true } }
     }
   })
+}
+
+export const subirImagenProducto = async (id: number, buffer: Buffer): Promise<string> => {
+  const producto = await prisma.productos.findUnique({ where: { id } })
+  if (!producto) throw new AppError(404, 'Producto no encontrado')
+
+  const imageUrl = await new Promise<string>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'productos', resource_type: 'image' },
+      (error, result) => {
+        if (error || !result) return reject(new AppError(500, 'Error al subir imagen a Cloudinary'))
+        resolve(result.secure_url)
+      }
+    )
+    stream.end(buffer)
+  })
+
+  await prisma.productos.update({
+    where: { id },
+    data: { imagen_url: imageUrl },
+  })
+
+  return imageUrl
 }
 
 export const eliminarProducto = async (id: number) => {

@@ -3,6 +3,7 @@ import {
   crearProductoController,
   actualizarProductoController,
   eliminarProductoController,
+  subirImagenProductoController,
   crearCategoriaController,
   actualizarCategoriaController,
   crearComboController,
@@ -11,6 +12,7 @@ import {
 } from './menu-admin.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
+import { uploadImagen } from '../../middlewares/upload.middleware'
 import {
   CrearProductoSchema,
   ActualizarProductoSchema,
@@ -29,9 +31,10 @@ router.post('/categorias',      ...soloGerente, validate(CrearCategoriaSchema), 
 router.patch('/categorias/:id', ...soloGerente, validate(ActualizarCategoriaSchema), actualizarCategoriaController)
 
 // Productos
-router.post('/productos',      ...soloGerente, validate(CrearProductoSchema),     crearProductoController)
-router.patch('/productos/:id', ...soloGerente, validate(ActualizarProductoSchema), actualizarProductoController)
-router.delete('/productos/:id',...soloGerente,                                     eliminarProductoController)
+router.post('/productos',            ...soloGerente, validate(CrearProductoSchema),     crearProductoController)
+router.patch('/productos/:id',       ...soloGerente, validate(ActualizarProductoSchema), actualizarProductoController)
+router.patch('/productos/:id/image', ...soloGerente, uploadImagen,                       subirImagenProductoController)
+router.delete('/productos/:id',      ...soloGerente,                                     eliminarProductoController)
 
 // Combos
 router.post('/combos',      ...soloGerente, validate(CrearComboSchema),     crearComboController)

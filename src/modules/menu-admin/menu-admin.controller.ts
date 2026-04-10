@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import {
-  crearProducto, actualizarProducto, eliminarProducto,
+  crearProducto, actualizarProducto, eliminarProducto, subirImagenProducto,
   crearCategoria, actualizarCategoria,
   crearCombo, actualizarCombo, eliminarCombo,
 } from './menu-admin.service'
@@ -18,6 +18,14 @@ export const actualizarProductoController = async (req: Request, res: Response) 
   if (isNaN(id)) throw new AppError(400, 'ID inválido')
   const producto = await actualizarProducto(id, req.body)
   res.json(producto)
+}
+
+export const subirImagenProductoController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  if (!req.file) throw new AppError(400, 'No se proporcionó ninguna imagen')
+  const imagen_url = await subirImagenProducto(id, req.file.buffer)
+  res.json({ imagen_url })
 }
 
 export const eliminarProductoController = async (req: Request, res: Response) => {
