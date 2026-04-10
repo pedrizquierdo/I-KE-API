@@ -1,4 +1,5 @@
 import { prisma } from '../../config/db'
+import { AppError } from '../../lib/AppError'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface CrearIngredienteDTO {
@@ -17,6 +18,11 @@ interface MovimientoDTO {
   cantidad: number
   motivo?: string
   empleadoId?: number
+}
+
+export interface PaginationParams {
+  page?: number
+  limit?: number
 }
 
 // ─── Ingredientes ─────────────────────────────────────────────────────────────
@@ -47,7 +53,7 @@ export const crearIngrediente = async (datos: CrearIngredienteDTO) => {
   const existe = await prisma.ingredientes.findUnique({
     where: { nombre: datos.nombre }
   })
-  if (existe) throw new Error('Ya existe un ingrediente con ese nombre')
+  if (existe) throw new AppError(409, 'Ya existe un ingrediente con ese nombre')
 
   return await prisma.ingredientes.create({
     data: {
@@ -70,7 +76,7 @@ export const actualizarIngrediente = async (
   datos: Partial<CrearIngredienteDTO>
 ) => {
   const ingrediente = await prisma.ingredientes.findUnique({ where: { id } })
-  if (!ingrediente) throw new Error('Ingrediente no encontrado')
+  if (!ingrediente) throw new AppError(404, 'Ingrediente no encontrado')
 
   return await prisma.ingredientes.update({
     where: { id },
@@ -93,22 +99,18 @@ export const registrarMovimiento = async (datos: MovimientoDTO) => {
   const ingrediente = await prisma.ingredientes.findUnique({
     where: { id: datos.ingredienteId }
   })
-  if (!ingrediente) throw new Error('Ingrediente no encontrado')
+  if (!ingrediente) throw new AppError(404, 'Ingrediente no encontrado')
+  if (datos.cantidad <= 0) throw new AppError(400, 'La cantidad debe ser mayor a 0')
 
-  if (datos.cantidad <= 0) throw new Error('La cantidad debe ser mayor a 0')
-
-  // Para merma y caducidad la cantidad es negativa
   const cantidadReal = ['merma', 'caducidad'].includes(datos.tipo)
     ? -Math.abs(datos.cantidad)
     : Math.abs(datos.cantidad)
 
-  // Verificar que no quede stock negativo
   const nuevoStock = parseFloat(ingrediente.stock_actual.toString()) + cantidadReal
   if (nuevoStock < 0) {
-    throw new Error(`Stock insuficiente. Stock actual: ${ingrediente.stock_actual}`)
+    throw new AppError(400, `Stock insuficiente. Stock actual: ${ingrediente.stock_actual}`)
   }
 
-  // Registrar movimiento y actualizar stock en una transacción
   const [movimiento] = await prisma.$transaction([
     prisma.movimientos_inventario.create({
       data: {
@@ -128,23 +130,33 @@ export const registrarMovimiento = async (datos: MovimientoDTO) => {
   return movimiento
 }
 
-export const getMovimientos = async (ingredienteId?: number) => {
-  return await prisma.movimientos_inventario.findMany({
-    where: ingredienteId ? { ingrediente_id: ingredienteId } : undefined,
-    include: {
-      ingredientes: { select: { id: true, nombre: true } },
-      empleados: { select: { id: true, nombre: true, apellido: true } }
-    },
-    orderBy: { creado_en: 'desc' },
-    take: 100
-  })
+export const getMovimientos = async (ingredienteId?: number, pagination?: PaginationParams) => {
+  const page = Math.max(1, pagination?.page ?? 1)
+  const limit = Math.min(100, Math.max(1, pagination?.limit ?? 50))
+  const skip = (page - 1) * limit
+
+  const [items, total] = await Promise.all([
+    prisma.movimientos_inventario.findMany({
+      where: ingredienteId ? { ingrediente_id: ingredienteId } : undefined,
+      include: {
+        ingredientes: { select: { id: true, nombre: true } },
+        empleados: { select: { id: true, nombre: true, apellido: true } }
+      },
+      orderBy: { creado_en: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.movimientos_inventario.count({
+      where: ingredienteId ? { ingrediente_id: ingredienteId } : undefined,
+    }),
+  ])
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
 // ─── Unidades de medida ───────────────────────────────────────────────────────
 export const getUnidadesMedida = async () => {
-  return await prisma.unidades_medida.findMany({
-    orderBy: { nombre: 'asc' }
-  })
+  return await prisma.unidades_medida.findMany({ orderBy: { nombre: 'asc' } })
 }
 
 // ─── Recetas ──────────────────────────────────────────────────────────────────
@@ -169,7 +181,7 @@ export const crearReceta = async (
   const existe = await prisma.recetas.findUnique({
     where: { producto_id_ingrediente_id: { producto_id: productoId, ingrediente_id: ingredienteId } }
   })
-  if (existe) throw new Error('Ya existe esa relación en la receta')
+  if (existe) throw new AppError(409, 'Ya existe esa relación en la receta')
 
   return await prisma.recetas.create({
     data: { producto_id: productoId, ingrediente_id: ingredienteId, cantidad }

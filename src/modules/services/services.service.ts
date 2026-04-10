@@ -1,15 +1,13 @@
 import { prisma } from '../../config/db'
+import { AppError } from '../../lib/AppError'
 
 // ─── Abrir servicio del día ───────────────────────────────────────────────────
 export const abrirServicio = async (empleadoId?: number) => {
-  // Verificar que no haya un servicio abierto
   const servicioActivo = await prisma.servicios.findFirst({
     where: { estado: 'abierto' }
   })
 
-  if (servicioActivo) {
-    throw new Error('Ya hay un servicio abierto')
-  }
+  if (servicioActivo) throw new AppError(409, 'Ya hay un servicio abierto')
 
   return await prisma.servicios.create({
     data: {
@@ -26,9 +24,7 @@ export const cerrarServicio = async () => {
     where: { estado: 'abierto' }
   })
 
-  if (!servicio) {
-    throw new Error('No hay ningún servicio abierto')
-  }
+  if (!servicio) throw new AppError(404, 'No hay ningún servicio abierto')
 
   return await prisma.servicios.update({
     where: { id: servicio.id },
@@ -41,7 +37,7 @@ export const cerrarServicio = async () => {
 
 // ─── Obtener servicio activo ──────────────────────────────────────────────────
 export const getServicioActivo = async () => {
-  const servicio = await prisma.servicios.findFirst({
+  return await prisma.servicios.findFirst({
     where: { estado: 'abierto' },
     include: {
       ubicaciones: {
@@ -52,6 +48,4 @@ export const getServicioActivo = async () => {
       }
     }
   })
-
-  return servicio
 }

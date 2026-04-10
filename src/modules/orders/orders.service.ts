@@ -1,6 +1,7 @@
 import { prisma } from '../../config/db'
 import { getServicioActivo } from '../services/services.service'
 import { Decimal } from '@prisma/client/runtime/library'
+import { AppError } from '../../lib/AppError'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ProductoOrden {
@@ -21,20 +22,20 @@ interface CrearOrdenDTO {
   nombreCliente?: string
 }
 
+export interface PaginationParams {
+  page?: number
+  limit?: number
+}
+
 // ─── Helper: aritmética segura con Decimal ────────────────────────────────────
 const toNum = (val: Decimal | string | number | null | undefined): number =>
   new Decimal(val?.toString() ?? '0').toNumber()
 
 // ─── Crear orden ──────────────────────────────────────────────────────────────
 export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
-  // 1. Verificar servicio activo
   const servicio = await getServicioActivo()
-  if (!servicio) {
-    throw new Error('No hay ningún servicio abierto')
-  }
+  if (!servicio) throw new AppError(400, 'No hay ningún servicio abierto')
 
-  // 2. Obtener productos y combos en UNA sola query cada uno
-  //    y construir maps para acceso O(1) — sin N+1
   const productosMap = new Map<number, { precio_base: Decimal; nombre: string }>()
   const combosMap    = new Map<number, { precio: Decimal; nombre: string }>()
 
@@ -56,14 +57,12 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
     rows.forEach((r) => combosMap.set(r.id, r))
   }
 
-  // 3. Calcular subtotal y construir detalles usando los maps (sin queries extra)
   let subtotal = 0
 
   const detallesProductos = (datos.productos ?? []).map((item) => {
     const producto = productosMap.get(item.productoId)
-    if (!producto) throw new Error(`Producto ${item.productoId} no disponible`)
-    const precio = toNum(producto.precio_base)
-    subtotal += precio * item.cantidad
+    if (!producto) throw new AppError(400, `Producto ${item.productoId} no disponible`)
+    subtotal += toNum(producto.precio_base) * item.cantidad
     return {
       producto_id: item.productoId,
       cantidad:    item.cantidad,
@@ -74,9 +73,8 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
 
   const detallesCombos = (datos.combos ?? []).map((item) => {
     const combo = combosMap.get(item.comboId)
-    if (!combo) throw new Error(`Combo ${item.comboId} no disponible`)
-    const precio = toNum(combo.precio)
-    subtotal += precio * item.cantidad
+    if (!combo) throw new AppError(400, `Combo ${item.comboId} no disponible`)
+    subtotal += toNum(combo.precio) * item.cantidad
     return {
       combo_id:        item.comboId,
       cantidad:        item.cantidad,
@@ -84,11 +82,8 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
     }
   })
 
-  if (subtotal === 0) {
-    throw new Error('La orden debe tener al menos un producto o combo')
-  }
+  if (subtotal === 0) throw new AppError(400, 'La orden debe tener al menos un producto o combo')
 
-  // 4. Crear orden + detalles + historial en una sola transacción
   const [orden] = await prisma.$transaction([
     prisma.ordenes.create({
       data: {
@@ -99,12 +94,8 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
         subtotal,
         descuento: 0,
         estado: 'pendiente',
-        orden_detalles: detallesProductos.length > 0
-          ? { create: detallesProductos }
-          : undefined,
-        orden_combos: detallesCombos.length > 0
-          ? { create: detallesCombos }
-          : undefined,
+        orden_detalles: detallesProductos.length > 0 ? { create: detallesProductos } : undefined,
+        orden_combos:   detallesCombos.length > 0   ? { create: detallesCombos }   : undefined,
       },
       include: {
         orden_detalles: {
@@ -119,52 +110,51 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
         },
       },
     }),
-    // Historial se crea en la misma transacción
-    // (se hace abajo porque necesitamos el id de la orden)
   ])
 
-  // El historial necesita el id — va fuera de la transacción anterior
-  // pero dentro de una propia para mantener atomicidad
   await prisma.orden_estados_historial.create({
-    data: {
-      orden_id: orden.id,
-      estado:   'pendiente',
-      notas:    'Orden creada',
-    },
+    data: { orden_id: orden.id, estado: 'pendiente', notas: 'Orden creada' },
   })
 
   return orden
 }
 
-// ─── Obtener órdenes activas (del servicio abierto si existe) ─────────────────
-export const getOrdenes = async () => {
-  // Filtra por servicio activo si hay uno abierto, para no mezclar días
-  const servicio = await getServicioActivo()
+// ─── Obtener órdenes activas del servicio abierto ─────────────────────────────
+export const getOrdenes = async (pagination?: PaginationParams) => {
+  const page  = Math.max(1, pagination?.page ?? 1)
+  const limit = Math.min(100, Math.max(1, pagination?.limit ?? 50))
+  const skip  = (page - 1) * limit
 
-  return await prisma.ordenes.findMany({
-    where: {
-      estado: { not: 'cancelada' },
-      ...(servicio ? { servicio_id: servicio.id } : {}),
-    },
-    include: {
-      orden_detalles: {
-        include: {
-          productos: { select: { id: true, nombre: true } },
+  const servicio = await getServicioActivo()
+  const where = {
+    estado: { not: 'cancelada' as const },
+    ...(servicio ? { servicio_id: servicio.id } : {}),
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.ordenes.findMany({
+      where,
+      include: {
+        orden_detalles: {
+          include: { productos: { select: { id: true, nombre: true } } },
+        },
+        orden_combos: {
+          include: { combos: { select: { id: true, nombre: true } } },
         },
       },
-      orden_combos: {
-        include: {
-          combos: { select: { id: true, nombre: true } },
-        },
-      },
-    },
-    orderBy: { creado_en: 'desc' },
-  })
+      orderBy: { creado_en: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.ordenes.count({ where }),
+  ])
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
 // ─── Obtener orden por ID ─────────────────────────────────────────────────────
 export const getOrdenById = async (id: number) => {
-  return await prisma.ordenes.findUnique({
+  const orden = await prisma.ordenes.findUnique({
     where: { id },
     include: {
       orden_detalles: {
@@ -177,21 +167,21 @@ export const getOrdenById = async (id: number) => {
           combos: { select: { id: true, nombre: true, precio: true } },
         },
       },
-      orden_estados_historial: {
-        orderBy: { registrado_en: 'asc' },
-      },
+      orden_estados_historial: { orderBy: { registrado_en: 'asc' } },
     },
   })
+
+  if (!orden) throw new AppError(404, 'Orden no encontrada')
+  return orden
 }
 
 // ─── Cambiar estado de la orden ───────────────────────────────────────────────
-// Transiciones válidas — evita saltos de estado incoherentes
 const TRANSICIONES: Record<string, string[]> = {
-  pendiente:       ['en_preparacion', 'cancelada'],
-  en_preparacion:  ['lista', 'cancelada'],
-  lista:           ['entregada', 'cancelada'],
-  entregada:       [],
-  cancelada:       [],
+  pendiente:      ['en_preparacion', 'cancelada'],
+  en_preparacion: ['lista', 'cancelada'],
+  lista:          ['entregada', 'cancelada'],
+  entregada:      [],
+  cancelada:      [],
 }
 
 export const cambiarEstadoOrden = async (
@@ -200,11 +190,12 @@ export const cambiarEstadoOrden = async (
   empleadoId?: number
 ) => {
   const orden = await prisma.ordenes.findUnique({ where: { id } })
-  if (!orden) throw new Error('Orden no encontrada')
+  if (!orden) throw new AppError(404, 'Orden no encontrada')
 
   const transicionesValidas = TRANSICIONES[orden.estado] ?? []
   if (!transicionesValidas.includes(estado)) {
-    throw new Error(
+    throw new AppError(
+      422,
       `No se puede pasar de "${orden.estado}" a "${estado}". ` +
       `Transiciones válidas: ${transicionesValidas.join(', ') || 'ninguna'}`
     )
@@ -224,21 +215,34 @@ export const cambiarEstadoOrden = async (
 }
 
 // ─── Órdenes por usuario ──────────────────────────────────────────────────────
-export const getOrdenesByUsuario = async (usuarioId: number) => {
-  return await prisma.ordenes.findMany({
-    where: { usuario_id: usuarioId },
-    include: {
-      orden_detalles: {
-        include: {
-          productos: { select: { id: true, nombre: true, precio_base: true } },
+export const getOrdenesByUsuario = async (usuarioId: number, pagination?: PaginationParams) => {
+  const page  = Math.max(1, pagination?.page ?? 1)
+  const limit = Math.min(100, Math.max(1, pagination?.limit ?? 20))
+  const skip  = (page - 1) * limit
+
+  const where = { usuario_id: usuarioId }
+
+  const [items, total] = await Promise.all([
+    prisma.ordenes.findMany({
+      where,
+      include: {
+        orden_detalles: {
+          include: {
+            productos: { select: { id: true, nombre: true, precio_base: true } },
+          },
+        },
+        orden_combos: {
+          include: {
+            combos: { select: { id: true, nombre: true, precio: true } },
+          },
         },
       },
-      orden_combos: {
-        include: {
-          combos: { select: { id: true, nombre: true, precio: true } },
-        },
-      },
-    },
-    orderBy: { creado_en: 'desc' },
-  })
+      orderBy: { creado_en: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.ordenes.count({ where }),
+  ])
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
