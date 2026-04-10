@@ -61,6 +61,282 @@ export const getDashboard = async () => {
   return result
 }
 
+// ─── Comparación de períodos ──────────────────────────────────────────────────
+interface MetricasPeriodo {
+  totalVentas:    number
+  totalOrdenes:   number
+  ticketPromedio: number
+  topProductos:   { id: string; nombre: string; cantidad: number; total: number }[]
+}
+
+// Consulta optimizada: solo las columnas necesarias para la comparación.
+// Ambas llamadas se ejecutan en paralelo desde compararVentas.
+async function getMetricasPeriodo(inicio: Date, fin: Date): Promise<MetricasPeriodo> {
+  const ordenes = await prisma.ordenes.findMany({
+    where: {
+      estado:    { not: 'cancelada' },
+      creado_en: { gte: inicio, lte: fin },
+    },
+    select: {
+      total: true,
+      orden_detalles: {
+        select: {
+          cantidad:        true,
+          subtotal:        true,   // nullable — dbgenerated solo aplica en INSERT
+          precio_unitario: true,   // fallback si subtotal es null
+          productos: { select: { id: true, nombre: true } },
+        },
+      },
+      orden_combos: {
+        select: {
+          cantidad:        true,
+          subtotal:        true,
+          precio_unitario: true,
+          combos: { select: { id: true, nombre: true } },
+        },
+      },
+    },
+  })
+
+  const totalOrdenes   = ordenes.length
+  const totalVentas    = ordenes.reduce((s, o) => s + parseFloat(o.total?.toString() ?? '0'), 0)
+  const ticketPromedio = totalOrdenes > 0 ? totalVentas / totalOrdenes : 0
+
+  // Acumular ventas por producto/combo
+  const productosMap: Record<string, { nombre: string; cantidad: number; total: number }> = {}
+
+  for (const o of ordenes) {
+    for (const d of o.orden_detalles) {
+      const key = String(d.productos.id)
+      if (!productosMap[key])
+        productosMap[key] = { nombre: d.productos.nombre, cantidad: 0, total: 0 }
+      // subtotal puede ser null (row insertada antes de la corrección del dbgenerated)
+      const importe = d.subtotal
+        ? parseFloat(d.subtotal.toString())
+        : parseFloat(d.precio_unitario.toString()) * d.cantidad
+      productosMap[key]!.cantidad += d.cantidad
+      productosMap[key]!.total   += importe
+    }
+    for (const c of o.orden_combos) {
+      const key = `combo_${c.combos.id}`
+      if (!productosMap[key])
+        productosMap[key] = { nombre: `[Combo] ${c.combos.nombre}`, cantidad: 0, total: 0 }
+      const importe = c.subtotal
+        ? parseFloat(c.subtotal.toString())
+        : parseFloat(c.precio_unitario.toString()) * c.cantidad
+      productosMap[key]!.cantidad += c.cantidad
+      productosMap[key]!.total   += importe
+    }
+  }
+
+  const topProductos = Object.entries(productosMap)
+    .map(([id, data]) => ({ id, ...data, total: parseFloat(data.total.toFixed(2)) }))
+    .sort((a, b) => b.cantidad - a.cantidad)
+    .slice(0, 10)
+
+  return {
+    totalVentas:    parseFloat(totalVentas.toFixed(2)),
+    totalOrdenes,
+    ticketPromedio: parseFloat(ticketPromedio.toFixed(2)),
+    topProductos,
+  }
+}
+
+// Variación absoluta y porcentual entre dos valores (v1 = base, v2 = nuevo).
+// porcentaje es null cuando la base es 0 (evita división por cero / Infinity).
+function delta(v1: number, v2: number) {
+  return {
+    absoluta:   parseFloat((v2 - v1).toFixed(2)),
+    porcentaje: v1 !== 0
+      ? parseFloat((((v2 - v1) / v1) * 100).toFixed(1))
+      : null,
+  }
+}
+
+function buildComparacion(
+  p1Inicio: string, p1Fin: string,
+  p2Inicio: string, p2Fin: string,
+  m1: MetricasPeriodo,
+  m2: MetricasPeriodo,
+) {
+  // Unión de los top productos de ambos períodos para la tabla comparativa.
+  // Si un producto solo apareció en uno de los dos, el otro queda como null.
+  const todosIds = new Set([
+    ...m1.topProductos.map(p => p.id),
+    ...m2.topProductos.map(p => p.id),
+  ])
+  const p1Map = Object.fromEntries(m1.topProductos.map(p => [p.id, p]))
+  const p2Map = Object.fromEntries(m2.topProductos.map(p => [p.id, p]))
+
+  const topProductosComparado = [...todosIds]
+    .map(id => {
+      const p1  = p1Map[id] ?? null
+      const p2  = p2Map[id] ?? null
+      const ref = (p1 ?? p2)!
+      return {
+        id,
+        nombre:            ref.nombre,
+        periodo1:          p1 ? { cantidad: p1.cantidad, total: p1.total } : null,
+        periodo2:          p2 ? { cantidad: p2.cantidad, total: p2.total } : null,
+        variacionCantidad: delta(p1?.cantidad ?? 0, p2?.cantidad ?? 0),
+        variacionTotal:    delta(p1?.total    ?? 0, p2?.total    ?? 0),
+      }
+    })
+    // Ordenar por popularidad combinada de ambos períodos
+    .sort((a, b) => {
+      const totalA = (a.periodo1?.cantidad ?? 0) + (a.periodo2?.cantidad ?? 0)
+      const totalB = (b.periodo1?.cantidad ?? 0) + (b.periodo2?.cantidad ?? 0)
+      return totalB - totalA
+    })
+
+  return {
+    periodo1: { inicio: p1Inicio, fin: p1Fin, ...m1 },
+    periodo2: { inicio: p2Inicio, fin: p2Fin, ...m2 },
+    variacion: {
+      totalVentas:    delta(m1.totalVentas,    m2.totalVentas),
+      totalOrdenes:   delta(m1.totalOrdenes,   m2.totalOrdenes),
+      ticketPromedio: delta(m1.ticketPromedio, m2.ticketPromedio),
+    },
+    topProductosComparado,
+  }
+}
+
+export const compararVentas = async (
+  p1Inicio: string, p1Fin: string,
+  p2Inicio: string, p2Fin: string,
+) => {
+  const cacheKey = `compare:${p1Inicio}:${p1Fin}:${p2Inicio}:${p2Fin}`
+  const cached = cache.get<ReturnType<typeof buildComparacion>>(cacheKey)
+  if (cached) return cached
+
+  // Los dos períodos se consultan en paralelo — mitad del tiempo de respuesta
+  const [m1, m2] = await Promise.all([
+    getMetricasPeriodo(inicioDia(p1Inicio), finDia(p1Fin)),
+    getMetricasPeriodo(inicioDia(p2Inicio), finDia(p2Fin)),
+  ])
+
+  const result = buildComparacion(p1Inicio, p1Fin, p2Inicio, p2Fin, m1, m2)
+  // TTL más largo que el dashboard: datos históricos no cambian con frecuencia
+  cache.set(cacheKey, result, 5 * 60 * 1000)
+  return result
+}
+
+// ─── Reporte de consumo de inventario (tipo = 'venta') ───────────────────────
+export const getReporteInventario = async (filtros: {
+  fechaInicio?: string
+  fechaFin?:    string
+}) => {
+  const cacheKey = `inventario:${filtros.fechaInicio ?? ''}:${filtros.fechaFin ?? ''}`
+  const cached = cache.get<ReturnType<typeof buildReporteInventario>>(cacheKey)
+  if (cached) return cached
+
+  // Construir el filtro de fecha de forma incremental
+  const whereBase = {
+    tipo: 'venta',
+    ...(filtros.fechaInicio || filtros.fechaFin
+      ? {
+          creado_en: {
+            ...(filtros.fechaInicio ? { gte: inicioDia(filtros.fechaInicio) } : {}),
+            ...(filtros.fechaFin    ? { lte: finDia(filtros.fechaFin)       } : {}),
+          },
+        }
+      : {}),
+  }
+
+  // groupBy por ingrediente + count total — en paralelo
+  const [grupos, totalMovimientos] = await Promise.all([
+    prisma.movimientos_inventario.groupBy({
+      by:     ['ingrediente_id'],
+      where:  whereBase,
+      _sum:   { cantidad: true },
+      _count: { _all: true },
+    }),
+    prisma.movimientos_inventario.count({ where: whereBase }),
+  ])
+
+  // Fetch de ingredientes en batch — evitar N+1
+  const ingIds = grupos.map(g => g.ingrediente_id)
+  const ingredientes = ingIds.length > 0
+    ? await prisma.ingredientes.findMany({
+        where:  { id: { in: ingIds } },
+        select: {
+          id:             true,
+          nombre:         true,
+          costo_unitario: true,
+          unidades_medida: { select: { simbolo: true } },
+        },
+      })
+    : []
+
+  const result = buildReporteInventario(
+    filtros.fechaInicio ?? null,
+    filtros.fechaFin    ?? null,
+    grupos,
+    ingredientes,
+    totalMovimientos,
+  )
+  cache.set(cacheKey, result, 3 * 60 * 1000) // 3 min — datos de stock cambian con frecuencia
+  return result
+}
+
+function buildReporteInventario(
+  fechaInicio:      string | null,
+  fechaFin:         string | null,
+  grupos:           any[],
+  ingredientes:     any[],
+  totalMovimientos: number,
+) {
+  const ingMap = new Map(ingredientes.map((i: any) => [i.id, i]))
+
+  const consumos = grupos
+    .map((g: any) => {
+      const ing = ingMap.get(g.ingrediente_id)
+
+      // Math.abs porque movimientos de consumo (tipo 'venta') pueden almacenarse
+      // con cantidad negativa (misma convención que 'merma' / 'caducidad').
+      const cantidadConsumida = Math.abs(
+        parseFloat(g._sum.cantidad?.toString() ?? '0'),
+      )
+
+      const costoUnitario: number | null = ing?.costo_unitario != null
+        ? parseFloat(ing.costo_unitario.toString())
+        : null
+
+      const costoTotal: number | null = costoUnitario !== null
+        ? parseFloat((cantidadConsumida * costoUnitario).toFixed(2))
+        : null
+
+      return {
+        ingredienteId:     g.ingrediente_id as number,
+        nombre:            ing?.nombre ?? `Ingrediente #${g.ingrediente_id}`,
+        unidad:            (ing?.unidades_medida?.simbolo as string) ?? '?',
+        cantidadConsumida: parseFloat(cantidadConsumida.toFixed(3)),
+        costoUnitario,
+        costoTotal,
+        totalMovimientos:  g._count._all as number,
+      }
+    })
+    .sort((a, b) => b.cantidadConsumida - a.cantidadConsumida) // mayor consumo primero
+
+  const costoTotalConsumo = parseFloat(
+    consumos.reduce((s, c) => s + (c.costoTotal ?? 0), 0).toFixed(2),
+  )
+  const ingredientesSinCosto = consumos.filter(c => c.costoUnitario === null).length
+
+  return {
+    resumen: {
+      periodo:           { inicio: fechaInicio, fin: fechaFin },
+      totalIngredientes: consumos.length,
+      totalMovimientos,
+      costoTotalConsumo,
+      // Aviso explícito: el costo total es parcial si algún ingrediente no tiene precio
+      ingredientesSinCosto,
+      costoParcial: ingredientesSinCosto > 0,
+    },
+    consumos,
+  }
+}
+
 // ─── Helpers privados ─────────────────────────────────────────────────────────
 function buildReporte(ordenes: any[]) {
   // A. Resumen ejecutivo

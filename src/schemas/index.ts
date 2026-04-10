@@ -245,6 +245,49 @@ export const CrearRecetaSchema = z.object({
 // ─────────────────────────────────────────────────────────────────────────────
 // USERS
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORTS
+// ─────────────────────────────────────────────────────────────────────────────
+const FechaSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido, usa YYYY-MM-DD')
+
+export const CompararVentasSchema = z.object({
+  periodo1Inicio: FechaSchema,
+  periodo1Fin:    FechaSchema,
+  periodo2Inicio: FechaSchema,
+  periodo2Fin:    FechaSchema,
+}).superRefine((data, ctx) => {
+  if (data.periodo1Inicio > data.periodo1Fin) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['periodo1Fin'],
+      message: 'periodo1Fin debe ser mayor o igual a periodo1Inicio',
+    })
+  }
+  if (data.periodo2Inicio > data.periodo2Fin) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['periodo2Fin'],
+      message: 'periodo2Fin debe ser mayor o igual a periodo2Inicio',
+    })
+  }
+})
+
+export const ReporteInventarioSchema = z.object({
+  fechaInicio: FechaSchema.optional(),
+  fechaFin:    FechaSchema.optional(),
+}).superRefine((data, ctx) => {
+  if (data.fechaInicio && data.fechaFin && data.fechaInicio > data.fechaFin) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['fechaFin'],
+      message: 'fechaFin debe ser mayor o igual a fechaInicio',
+    })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────────────────────
 export const ActualizarUsuarioSchema = z.object({
   rol:        RolSchema.optional(),
   activo:     z.boolean().optional(),

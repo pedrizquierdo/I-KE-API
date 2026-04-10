@@ -2,9 +2,13 @@ import { Router } from 'express'
 import {
   getReporteVentasController,
   getDashboardController,
+  compararVentasController,
+  getReporteInventarioController,
 } from './reports.controller'
 import { getReporteVentas } from './reports.service'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { validateQuery } from '../../middlewares/validate.middleware'
+import { CompararVentasSchema, ReporteInventarioSchema } from '../../schemas'
 
 const router = Router()
 
@@ -23,8 +27,23 @@ router.get('/sales/today', ...soloAdmin, async (req, res) => {
   }
 })
 
+// Comparación de dos períodos — debe ir antes de /sales para que Express
+// no confunda /sales/compare con el handler de /sales
+router.get('/sales/compare',
+  ...soloAdmin,
+  validateQuery(CompararVentasSchema),
+  compararVentasController,
+)
+
 // Reporte de ventas con filtros opcionales
 router.get('/sales', ...soloAdmin, getReporteVentasController)
+
+// Consumo de inventario agrupado por ingrediente (movimientos tipo 'venta')
+router.get('/inventory',
+  ...soloAdmin,
+  validateQuery(ReporteInventarioSchema),
+  getReporteInventarioController,
+)
 
 
 
