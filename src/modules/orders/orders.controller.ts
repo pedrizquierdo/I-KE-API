@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden, getOrdenesByUsuario, getOrdenesDelivery } from './orders.service'
+import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden, getOrdenesByUsuario, getOrdenesDelivery, editarItemsOrden } from './orders.service'
 import { AppError } from '../../lib/AppError'
 import { getIo } from '../../lib/socket'
 
@@ -27,6 +27,19 @@ export const getOrdenByIdController = async (req: Request, res: Response) => {
   const id = parseInt(req.params['id'] as string)
   if (isNaN(id)) throw new AppError(400, 'ID inválido')
   const orden = await getOrdenById(id)
+  res.json(orden)
+}
+
+export const editarItemsOrdenController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+
+  const { productos, combos } = req.body
+  const orden = await editarItemsOrden(id, { productos, combos }, req.usuario?.id)
+
+  // Notificar a cocina: la orden cambió su composición
+  getIo().to('cocina').emit('orden:items_actualizados', { id: orden.id, estado: orden.estado, orden })
+
   res.json(orden)
 }
 

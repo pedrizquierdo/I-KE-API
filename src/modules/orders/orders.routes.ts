@@ -6,10 +6,11 @@ import {
   cambiarEstadoOrdenController,
   getOrdenesByUsuarioController,
   getOrdenesDeliveryController,
+  editarItemsOrdenController,
 } from './orders.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
-import { CrearOrdenSchema, CambiarEstadoOrdenSchema } from '../../schemas'
+import { CrearOrdenSchema, CambiarEstadoOrdenSchema, ActualizarItemsOrdenSchema } from '../../schemas'
 
 const router = Router()
 
@@ -45,6 +46,14 @@ router.get('/:id',
   verificarToken,
   verificarRol('gerente', 'cajero', 'cocinero', 'mesero'),
   getOrdenByIdController,
+)
+
+// Editar items (agregar / cambiar cantidad / eliminar) — gerente, cajero, mesero
+router.patch('/:id/items',
+  verificarToken,
+  verificarRol('gerente', 'cajero', 'mesero'),
+  validate(ActualizarItemsOrdenSchema),
+  editarItemsOrdenController,
 )
 
 // Cambiar estado — solo staff de cocina/servicio

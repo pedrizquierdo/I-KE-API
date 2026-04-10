@@ -220,6 +220,186 @@ export const cambiarEstadoOrden = async (
   return ordenActualizada
 }
 
+// ─── Editar items de una orden ────────────────────────────────────────────────
+interface EditarItemsOrdenDTO {
+  productos?: { productoId: number; cantidad: number; notas?: string }[]
+  combos?: { comboId: number; cantidad: number }[]
+}
+
+export const editarItemsOrden = async (
+  ordenId: number,
+  datos: EditarItemsOrdenDTO,
+  empleadoId?: number,
+) => {
+  // ── 1. Cargar orden con sus items actuales ───────────────────────────────────
+  const orden = await prisma.ordenes.findUnique({
+    where: { id: ordenId },
+    include: { orden_detalles: true, orden_combos: true },
+  })
+  if (!orden) throw new AppError(404, 'Orden no encontrada')
+
+  if (!['pendiente', 'en_preparacion'].includes(orden.estado)) {
+    throw new AppError(
+      422,
+      `No se pueden editar items de una orden en estado "${orden.estado}". ` +
+      'Solo se permite en "pendiente" o "en_preparacion".',
+    )
+  }
+
+  const esPendiente = orden.estado === 'pendiente'
+
+  // ── 2. Separar operaciones por tipo ─────────────────────────────────────────
+  const productosUpsert   = (datos.productos ?? []).filter(p => p.cantidad > 0)
+  const productosEliminar = (datos.productos ?? []).filter(p => p.cantidad === 0)
+  const combosUpsert      = (datos.combos ?? []).filter(c => c.cantidad > 0)
+  const combosEliminar    = (datos.combos ?? []).filter(c => c.cantidad === 0)
+
+  if (!esPendiente && (productosEliminar.length > 0 || combosEliminar.length > 0)) {
+    throw new AppError(
+      422,
+      'La orden ya está en preparación: solo se pueden agregar items o cambiar cantidades, no eliminar.',
+    )
+  }
+
+  // ── 3. Mapas de items existentes (clave: productoId / comboId) ───────────────
+  // Si por algún edge-case hubiera duplicados en BD, el último gana (no debería ocurrir).
+  const detallesMap = new Map(orden.orden_detalles.map(d => [d.producto_id, d]))
+  const combosMap   = new Map(orden.orden_combos.map(c => [c.combo_id, c]))
+
+  // ── 4. Obtener precios actuales solo para los items NUEVOS ───────────────────
+  // Los items existentes conservan su precio_unitario congelado al crear la orden.
+  const nuevosProductoIds = productosUpsert
+    .filter(p => !detallesMap.has(p.productoId))
+    .map(p => p.productoId)
+
+  const productoPrecioMap = new Map<number, Decimal>()
+  if (nuevosProductoIds.length > 0) {
+    const rows = await prisma.productos.findMany({
+      where: { id: { in: nuevosProductoIds }, disponible: true },
+      select: { id: true, precio_base: true },
+    })
+    rows.forEach(r => productoPrecioMap.set(r.id, r.precio_base))
+    for (const id of nuevosProductoIds) {
+      if (!productoPrecioMap.has(id))
+        throw new AppError(400, `Producto ${id} no existe o no está disponible`)
+    }
+  }
+
+  const nuevosCombosIds = combosUpsert
+    .filter(c => !combosMap.has(c.comboId))
+    .map(c => c.comboId)
+
+  const comboPrecioMap = new Map<number, Decimal>()
+  if (nuevosCombosIds.length > 0) {
+    const rows = await prisma.combos.findMany({
+      where: { id: { in: nuevosCombosIds }, disponible: true },
+      select: { id: true, precio: true },
+    })
+    rows.forEach(r => comboPrecioMap.set(r.id, r.precio))
+    for (const id of nuevosCombosIds) {
+      if (!comboPrecioMap.has(id))
+        throw new AppError(400, `Combo ${id} no existe o no está disponible`)
+    }
+  }
+
+  // ── 5. Transacción: mutaciones + recálculo de subtotal ───────────────────────
+  await prisma.$transaction(async (tx) => {
+    // Eliminar productos (solo en 'pendiente', ya validado arriba)
+    for (const item of productosEliminar) {
+      const d = detallesMap.get(item.productoId)
+      if (!d) throw new AppError(400, `El producto ${item.productoId} no está en esta orden`)
+      await tx.orden_detalles.delete({ where: { id: d.id } })
+    }
+
+    // Eliminar combos
+    for (const item of combosEliminar) {
+      const c = combosMap.get(item.comboId)
+      if (!c) throw new AppError(400, `El combo ${item.comboId} no está en esta orden`)
+      await tx.orden_combos.delete({ where: { id: c.id } })
+    }
+
+    // Upsert productos
+    for (const item of productosUpsert) {
+      const existente = detallesMap.get(item.productoId)
+      if (existente) {
+        // Actualizar cantidad y recalcular subtotal de la fila.
+        // dbgenerated() solo aplica en INSERT — hay que computarlo manualmente en UPDATE.
+        await tx.orden_detalles.update({
+          where: { id: existente.id },
+          data: {
+            cantidad: item.cantidad,
+            subtotal: new Decimal(item.cantidad).mul(existente.precio_unitario),
+            ...(item.notas !== undefined ? { notas_item: item.notas } : {}),
+          },
+        })
+      } else {
+        // Nuevo item — la DB calcula subtotal vía DEFAULT dbgenerated
+        await tx.orden_detalles.create({
+          data: {
+            orden_id:        ordenId,
+            producto_id:     item.productoId,
+            cantidad:        item.cantidad,
+            precio_unitario: productoPrecioMap.get(item.productoId)!,
+            notas_item:      item.notas ?? null,
+          },
+        })
+      }
+    }
+
+    // Upsert combos
+    for (const item of combosUpsert) {
+      const existente = combosMap.get(item.comboId)
+      if (existente) {
+        await tx.orden_combos.update({
+          where: { id: existente.id },
+          data: {
+            cantidad: item.cantidad,
+            subtotal: new Decimal(item.cantidad).mul(existente.precio_unitario),
+          },
+        })
+      } else {
+        await tx.orden_combos.create({
+          data: {
+            orden_id:        ordenId,
+            combo_id:        item.comboId,
+            cantidad:        item.cantidad,
+            precio_unitario: comboPrecioMap.get(item.comboId)!,
+          },
+        })
+      }
+    }
+
+    // Verificar que la orden no quede vacía tras las eliminaciones
+    const [detallesFinal, combosFinal] = await Promise.all([
+      tx.orden_detalles.findMany({
+        where:  { orden_id: ordenId },
+        select: { precio_unitario: true, cantidad: true },
+      }),
+      tx.orden_combos.findMany({
+        where:  { orden_id: ordenId },
+        select: { precio_unitario: true, cantidad: true },
+      }),
+    ])
+
+    if (detallesFinal.length === 0 && combosFinal.length === 0) {
+      throw new AppError(422, 'La orden debe conservar al menos un producto o combo')
+    }
+
+    // Recalcular ordenes.subtotal (no es computed en BD — se almacena manualmente)
+    const nuevoSubtotal =
+      detallesFinal.reduce((sum, d) => sum + toNum(d.precio_unitario) * d.cantidad, 0) +
+      combosFinal.reduce((sum, c)   => sum + toNum(c.precio_unitario) * c.cantidad, 0)
+
+    await tx.ordenes.update({
+      where: { id: ordenId },
+      data:  { subtotal: nuevoSubtotal, actualizado_en: new Date() },
+    })
+  })
+
+  // ── 6. Devolver la orden actualizada completa (incluye total recalculado) ────
+  return getOrdenById(ordenId)
+}
+
 // ─── Órdenes de domicilio (vista del repartidor) ─────────────────────────────
 // Muestra todas las órdenes de tipo 'domicilio' en estados activos.
 // El repartidor ve la cola completa; la asignación individual se gestiona

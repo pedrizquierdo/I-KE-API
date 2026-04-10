@@ -82,6 +82,50 @@ export const CambiarEstadoOrdenSchema = z.object({
   }),
 })
 
+// Cada item lleva su productoId/comboId + la cantidad deseada.
+// cantidad > 0 → agregar si no existe, actualizar si ya existe.
+// cantidad = 0 → eliminar (solo permitido en estado 'pendiente').
+const ItemProductoEditSchema = z.object({
+  productoId: z.number().int().positive('productoId debe ser un entero positivo'),
+  cantidad:   z.number().int().min(0, 'La cantidad mínima es 0 (0 = eliminar)'),
+  notas:      z.string().max(200).optional(),
+})
+
+const ItemComboEditSchema = z.object({
+  comboId:  z.number().int().positive('comboId debe ser un entero positivo'),
+  cantidad: z.number().int().min(0, 'La cantidad mínima es 0 (0 = eliminar)'),
+})
+
+export const ActualizarItemsOrdenSchema = z.object({
+  productos: z.array(ItemProductoEditSchema).optional(),
+  combos:    z.array(ItemComboEditSchema).optional(),
+}).superRefine((data, ctx) => {
+  if ((data.productos?.length ?? 0) + (data.combos?.length ?? 0) === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Debes enviar al menos un item para modificar',
+    })
+  }
+  // Prohibir productoId duplicado en la misma petición
+  const pIds = data.productos?.map(p => p.productoId) ?? []
+  if (new Set(pIds).size !== pIds.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['productos'],
+      message: 'No se permiten productoId duplicados en la misma solicitud',
+    })
+  }
+  // Prohibir comboId duplicado en la misma petición
+  const cIds = data.combos?.map(c => c.comboId) ?? []
+  if (new Set(cIds).size !== cIds.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['combos'],
+      message: 'No se permiten comboId duplicados en la misma solicitud',
+    })
+  }
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PAYMENTS
 // ─────────────────────────────────────────────────────────────────────────────
