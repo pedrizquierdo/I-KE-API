@@ -32,6 +32,23 @@ export const verificarToken = (req: Request, res: Response, next: NextFunction) 
   }
 }
 
+// Middleware opcional — extrae el usuario del token si está presente,
+// pero permite continuar aunque no haya token o sea inválido.
+// Útil para rutas accesibles tanto a anónimos como a usuarios autenticados.
+export const verificarTokenOpcional = (req: Request, _res: Response, next: NextFunction) => {
+  try {
+    const authHeader = req.headers['authorization']
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1] as string
+      const payload = jwt.verify(token, JWT_SECRET) as TokenPayload
+      req.usuario = payload
+    }
+  } catch {
+    // Token inválido o expirado — simplemente no se asigna req.usuario
+  }
+  next()
+}
+
 // Middleware para verificar roles específicos
 export const verificarRol = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {

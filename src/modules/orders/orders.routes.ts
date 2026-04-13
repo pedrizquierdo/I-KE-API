@@ -9,14 +9,15 @@ import {
   editarItemsOrdenController,
   actualizarTiempoEstimadoController,
 } from './orders.controller'
-import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { verificarToken, verificarTokenOpcional, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
 import { CrearOrdenSchema, CambiarEstadoOrdenSchema, ActualizarItemsOrdenSchema, ActualizarTiempoEstimadoSchema } from '../../schemas'
 
 const router = Router()
 
-// Crear orden — cualquier usuario autenticado (o anónimo para pedidos de mostrador)
+// Crear orden — acepta anónimos y autenticados; si hay token válido se vincula la orden al usuario
 router.post('/',
+  verificarTokenOpcional,
   validate(CrearOrdenSchema),
   crearOrdenController,
 )
