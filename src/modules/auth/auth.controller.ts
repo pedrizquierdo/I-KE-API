@@ -1,5 +1,7 @@
 import { Request, Response } from 'express'
+import jwt from 'jsonwebtoken'
 import { login, refresh, registrar, solicitarResetPassword, resetPassword } from './auth.service'
+import type { TokenPayload } from './auth.service'
 import { AppError } from '../../lib/AppError'
 
 // Express 5 captura automáticamente los rechazos de promesas y los pasa al middleware de error.
@@ -36,8 +38,46 @@ export const refreshController = async (req: Request, res: Response) => {
 }
 
 export const registrarController = async (req: Request, res: Response) => {
-  const { email, password, rol, empleadoId } = req.body
-  const usuario = await registrar(email, password, rol, empleadoId)
+  const { email, password } = req.body
+  const authHeader = req.headers['authorization']
+
+  let rolFinal: string
+  let empleadoIdFinal: number | undefined
+
+  if (!authHeader) {
+    // ── Registro público: sin token → siempre 'cliente', empleadoId ignorado ──
+    rolFinal        = 'cliente'
+    empleadoIdFinal = undefined
+
+  } else {
+    // ── Token presente: verificar manualmente ────────────────────────────────
+    if (!authHeader.startsWith('Bearer ')) {
+      throw new AppError(401, 'Formato de token inválido')
+    }
+
+    let payload: TokenPayload
+    try {
+      payload = jwt.verify(
+        authHeader.split(' ')[1] as string,
+        process.env.JWT_SECRET as string,
+      ) as TokenPayload
+    } catch {
+      throw new AppError(401, 'Token inválido o expirado')
+    }
+
+    if (payload.rol !== 'gerente') {
+      throw new AppError(403, 'No tienes permisos para registrar usuarios con otro rol')
+    }
+
+    // ── Gerente: el rol del body es obligatorio ───────────────────────────────
+    const { rol, empleadoId } = req.body
+    if (!rol) throw new AppError(400, 'El campo rol es requerido para registro administrativo')
+
+    rolFinal        = rol as string
+    empleadoIdFinal = empleadoId as number | undefined
+  }
+
+  const usuario = await registrar(email, password, rolFinal, empleadoIdFinal)
   res.status(201).json(usuario)
 }
 

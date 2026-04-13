@@ -25,10 +25,12 @@ router.get('/me',        verificarToken,                        meController)
 router.post('/forgot-password', authLimiter, validate(ForgotPasswordSchema), forgotPasswordController)
 router.post('/reset-password',  authLimiter, validate(ResetPasswordSchema),  resetPasswordController)
 
-// Solo gerente puede registrar nuevos usuarios
+// Registro abierto al público.
+// Sin token  → el controller fuerza rol='cliente'.
+// Con token de gerente → el controller usa el rol del body.
+// Con token de otro rol → el controller devuelve 403.
 router.post('/register',
-  verificarToken,
-  verificarRol('gerente'),
+  authLimiter,
   validate(RegistrarSchema),
   registrarController,
 )

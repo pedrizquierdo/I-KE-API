@@ -18,14 +18,15 @@ export const LoginSchema = z.object({
 })
 
 export const RolSchema = z.enum(
-  ['gerente', 'cajero', 'cocinero', 'mesero', 'repartidor'],
+  ['gerente', 'cajero', 'cocinero', 'mesero', 'repartidor', 'cliente'],
   { message: 'Rol inválido' }
 )
 
 export const RegistrarSchema = z.object({
   email:      z.string().email('Email inválido'),
   password:   z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-  rol:        RolSchema,
+  // opcional: ausente en registro público (se fuerza a 'cliente' en el controller)
+  rol:        RolSchema.optional(),
   empleadoId: z.number().int().positive().optional(),
 })
 
