@@ -4,6 +4,12 @@ import { env } from '../config/env'
 // Transporter reutilizable — se configura una sola vez al arrancar el servidor.
 // family:4 fuerza IPv4: Railway no tiene salida IPv6 y Gmail resuelve a IPv6
 // por defecto, causando ENETUNREACH en el connect.
+// El cast `as any` es necesario porque @types/nodemailer no expone `family`
+// aunque la opción es válida en runtime (se pasa a net.connect internamente).
+// `family` no está en @types/nodemailer pero es válido en runtime (pasa a net.connect).
+// Se extiende el tipo localmente para no perder type-checking del resto de opciones.
+type SmtpOptions = Parameters<typeof nodemailer.createTransport>[0] & { family?: number }
+
 export const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
@@ -13,7 +19,7 @@ export const transporter = nodemailer.createTransport({
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
   },
-})
+} as SmtpOptions)
 
 // ─── Plantillas ───────────────────────────────────────────────────────────────
 export const enviarEmailResetPassword = async (
