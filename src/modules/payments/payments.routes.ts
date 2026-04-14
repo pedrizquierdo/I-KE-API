@@ -8,7 +8,7 @@ import {
   confirmarPagoController,
   getPendingTransfersController,
 } from './payments.controller'
-import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
+import { verificarToken, verificarTokenOpcional, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
 import { uploadComprobante } from '../../middlewares/upload.middleware'
 import { ProcesarPagoSchema, ConfirmarPagoSchema } from '../../schemas'
@@ -22,7 +22,12 @@ router.get('/pendientes',         ...soloCajero, getOrdenesPendientesPagoControl
 // IMPORTANTE: /pending-transfers antes de /:id para que Express no lo interprete como ID
 router.get('/pending-transfers',  ...soloCajero, getPendingTransfersController)
 router.get('/orden/:id',          ...soloCajero, getPagosByOrdenController)
-router.post('/',   ...soloCajero, validate(ProcesarPagoSchema), procesarPagoController)
+// Crear pago — cajero/gerente en ventanilla; cliente autenticado para registrar transferencia propia
+router.post('/',
+  verificarToken,
+  validate(ProcesarPagoSchema),
+  procesarPagoController,
+)
 
 // Subir comprobante — cualquier usuario autenticado (cliente puede subir su transferencia)
 router.post('/:id/comprobante',
