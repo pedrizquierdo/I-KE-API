@@ -225,14 +225,17 @@ model ordenes {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model pagos {
-  id             Int          @id @default(autoincrement())
-  orden_id       Int
-  metodo_pago_id Int
-  monto          Decimal      @db.Decimal(10, 2)
-  referencia     String?      @db.VarChar(100)
-  pagado_en      DateTime     @default(now()) @db.Timestamptz(6)
-  metodos_pago   metodos_pago @relation(fields: [metodo_pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  ordenes        ordenes      @relation(fields: [orden_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id                   Int          @id @default(autoincrement())
+  orden_id             Int
+  metodo_pago_id       Int
+  monto                Decimal      @db.Decimal(10, 2)
+  referencia           String?      @db.VarChar(100)
+  pagado_en            DateTime     @default(now()) @db.Timestamptz(6)
+  comprobante_url      String?
+  confirmado           Boolean?
+  notas_confirmacion   String?
+  metodos_pago         metodos_pago @relation(fields: [metodo_pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes              ordenes      @relation(fields: [orden_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model producto_modificador_grupos {

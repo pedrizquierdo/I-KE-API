@@ -1,5 +1,13 @@
 import { Request, Response } from 'express'
-import { procesarPago, getMetodosPago, getPagosByOrden, getOrdenesPendientesPago } from './payments.service'
+import {
+  procesarPago,
+  getMetodosPago,
+  getPagosByOrden,
+  getOrdenesPendientesPago,
+  subirComprobante,
+  confirmarPago,
+  getPendingTransfers,
+} from './payments.service'
 import { AppError } from '../../lib/AppError'
 
 export const procesarPagoController = async (req: Request, res: Response) => {
@@ -28,4 +36,25 @@ export const getPagosByOrdenController = async (req: Request, res: Response) => 
 export const getOrdenesPendientesPagoController = async (_req: Request, res: Response) => {
   const ordenes = await getOrdenesPendientesPago()
   res.json(ordenes)
+}
+
+export const subirComprobanteController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  if (!req.file) throw new AppError(400, 'Se requiere un archivo de imagen en el campo "comprobante"')
+  const pago = await subirComprobante(id, req.file.buffer)
+  res.json(pago)
+}
+
+export const confirmarPagoController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  const { aprobado, notas } = req.body as { aprobado: boolean; notas?: string }
+  const pago = await confirmarPago(id, aprobado, notas)
+  res.json(pago)
+}
+
+export const getPendingTransfersController = async (_req: Request, res: Response) => {
+  const pagos = await getPendingTransfers()
+  res.json(pagos)
 }

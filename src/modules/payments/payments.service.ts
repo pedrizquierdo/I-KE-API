@@ -1,6 +1,7 @@
 import { prisma } from '../../config/db'
 import { Decimal } from '@prisma/client/runtime/library'
 import { AppError } from '../../lib/AppError'
+import { cloudinary } from '../../config/cloudinary'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ProcesarPagoDTO {
@@ -106,6 +107,104 @@ export const getPagosByOrden = async (ordenId: number) => {
     restante:     parseFloat(Math.max(0, totalOrden - totalPagado).toFixed(2)),
     pagada:       totalPagado >= totalOrden - 0.01,
   }
+}
+
+// ─── Helper: subir buffer a Cloudinary ───────────────────────────────────────
+const subirACloudinary = (buffer: Buffer, folder: string): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream({ folder }, (err, result) => {
+      if (err || !result) return reject(err ?? new Error('Error al subir imagen'))
+      resolve(result.secure_url)
+    })
+    stream.end(buffer)
+  })
+
+// ─── Subir comprobante de pago ────────────────────────────────────────────────
+export const subirComprobante = async (pagoId: number, buffer: Buffer) => {
+  const pago = await prisma.pagos.findUnique({ where: { id: pagoId } })
+  if (!pago) throw new AppError(404, 'Pago no encontrado')
+
+  const url = await subirACloudinary(buffer, 'comprobantes')
+
+  return await prisma.pagos.update({
+    where: { id: pagoId },
+    data:  { comprobante_url: url, confirmado: null },
+    include: {
+      metodos_pago: { select: { id: true, nombre: true } },
+      ordenes:      { select: { id: true, numero: true, estado: true, total: true } },
+    },
+  })
+}
+
+// ─── Aprobar o rechazar comprobante ──────────────────────────────────────────
+export const confirmarPago = async (
+  pagoId:   number,
+  aprobado: boolean,
+  notas?:   string,
+) => {
+  const pago = await prisma.pagos.findUnique({
+    where:   { id: pagoId },
+    include: { ordenes: true },
+  })
+  if (!pago) throw new AppError(404, 'Pago no encontrado')
+  if (!pago.comprobante_url) throw new AppError(400, 'Este pago no tiene comprobante adjunto')
+  if (pago.confirmado !== null) {
+    throw new AppError(400, `El comprobante ya fue ${pago.confirmado ? 'aprobado' : 'rechazado'}`)
+  }
+
+  if (aprobado) {
+    // ── Aprobar: marcar pago y cerrar la orden ────────────────────────────────
+    const [pagoActualizado] = await prisma.$transaction([
+      prisma.pagos.update({
+        where: { id: pagoId },
+        data:  { confirmado: true, notas_confirmacion: notas ?? null },
+        include: {
+          metodos_pago: { select: { id: true, nombre: true } },
+          ordenes:      { select: { id: true, numero: true, estado: true, total: true } },
+        },
+      }),
+      prisma.ordenes.update({
+        where: { id: pago.orden_id },
+        data:  { estado: 'entregada', actualizado_en: new Date() },
+      }),
+    ])
+    return pagoActualizado
+  } else {
+    // ── Rechazar: limpiar comprobante, orden permanece en su estado actual ────
+    return await prisma.pagos.update({
+      where: { id: pagoId },
+      data:  { confirmado: false, notas_confirmacion: notas ?? null, comprobante_url: null },
+      include: {
+        metodos_pago: { select: { id: true, nombre: true } },
+        ordenes:      { select: { id: true, numero: true, estado: true, total: true } },
+      },
+    })
+  }
+}
+
+// ─── Transferencias pendientes de revisión ───────────────────────────────────
+export const getPendingTransfers = async () => {
+  return await prisma.pagos.findMany({
+    where: {
+      comprobante_url:    { not: null },
+      confirmado:         null,
+    },
+    include: {
+      metodos_pago: { select: { id: true, nombre: true } },
+      ordenes: {
+        select: {
+          id:            true,
+          numero:        true,
+          estado:        true,
+          total:         true,
+          tipo_servicio: true,
+          creado_en:     true,
+          nombre_cliente: true,
+        },
+      },
+    },
+    orderBy: { pagado_en: 'asc' },
+  })
 }
 
 // ─── Órdenes pendientes de pago ───────────────────────────────────────────────

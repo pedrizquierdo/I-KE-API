@@ -148,6 +148,11 @@ export const ProcesarPagoSchema = z.object({
   referencia:   z.string().max(100).optional(),
 })
 
+export const ConfirmarPagoSchema = z.object({
+  aprobado: z.boolean({ message: 'El campo aprobado debe ser true o false' }),
+  notas:    z.string().max(300).optional(),
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MENU ADMIN — Productos
 // ─────────────────────────────────────────────────────────────────────────────
