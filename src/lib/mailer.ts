@@ -1,11 +1,14 @@
 import nodemailer from 'nodemailer'
 import { env } from '../config/env'
 
-// Transporter reutilizable — se configura una sola vez al arrancar el servidor
+// Transporter reutilizable — se configura una sola vez al arrancar el servidor.
+// family:4 fuerza IPv4: Railway no tiene salida IPv6 y Gmail resuelve a IPv6
+// por defecto, causando ENETUNREACH en el connect.
 export const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
-  secure: env.SMTP_PORT === 465, // true solo para puerto 465 (SSL), false para STARTTLS (587)
+  secure: env.SMTP_PORT === 465, // true para puerto 465 (SSL), false para STARTTLS (587)
+  family: 4,                     // forzar IPv4 — evita ENETUNREACH en Railway
   auth: {
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,

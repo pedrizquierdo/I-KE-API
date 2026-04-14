@@ -22,6 +22,11 @@ const httpServer = http.createServer(app)
 
 const PORT = process.env.PORT || 3000
 
+// Railway (y cualquier plataforma PaaS) sienta el servidor detrás de un
+// reverse proxy que añade X-Forwarded-For. Sin esto express-rate-limit lanza
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR y no puede identificar IPs correctamente.
+app.set('trust proxy', 1)
+
 const corsOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
