@@ -573,7 +573,22 @@ export const getOrdenesByUsuario = async (usuarioId: number, pagination?: Pagina
   const [items, total] = await Promise.all([
     prisma.ordenes.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        numero: true,
+        estado: true,
+        tipo_servicio: true,
+        nombre_cliente: true,
+        telefono_cliente: true,
+        direccion_entrega: true,
+        latitud_entrega: true,
+        longitud_entrega: true,
+        subtotal: true,
+        total: true,
+        notas_orden: true,
+        creado_en: true,
+        actualizado_en: true,
+        tiempo_estimado_minutos: true,
         orden_detalles: {
           include: {
             productos: { select: { id: true, nombre: true, precio_base: true } },
