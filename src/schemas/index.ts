@@ -51,6 +51,8 @@ export const CrearOrdenSchema = z.object({
   notas:            z.string().max(500).optional(),
   nombreCliente:    z.string().min(1).max(100).optional(),
   direccionEntrega: z.string().min(5).max(300).optional(),
+  latitudEntrega:   z.number().min(-90).max(90).optional(),
+  longitudEntrega:  z.number().min(-180).max(180).optional(),
   telefonoCliente:  z.string().min(7).max(20).optional(),
 }).superRefine((data, ctx) => {
   if ((data.productos?.length ?? 0) + (data.combos?.length ?? 0) === 0) {
@@ -91,6 +93,10 @@ export const ActualizarTiempoEstimadoSchema = z.object({
     .min(1,   'El tiempo mínimo es 1 minuto')
     .max(480, 'El tiempo máximo es 480 minutos (8 horas)')
     .nullable(),
+})
+
+export const AsignarRepartidorSchema = z.object({
+  repartidorId: z.number().int().positive('repartidorId debe ser un entero positivo'),
 })
 
 // Cada item lleva su productoId/comboId + la cantidad deseada.

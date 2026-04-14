@@ -1,12 +1,23 @@
 import { Request, Response } from 'express'
-import { crearOrden, getOrdenes, getOrdenById, cambiarEstadoOrden, getOrdenesByUsuario, getOrdenesDelivery, editarItemsOrden, actualizarTiempoEstimado } from './orders.service'
+import {
+  crearOrden,
+  getOrdenes,
+  getOrdenById,
+  cambiarEstadoOrden,
+  getOrdenesByUsuario,
+  getOrdenesDelivery,
+  editarItemsOrden,
+  actualizarTiempoEstimado,
+  asignarRepartidor,
+  getMyDeliveries,
+} from './orders.service'
 import { AppError } from '../../lib/AppError'
 import { getIo } from '../../lib/socket'
 
 export const crearOrdenController = async (req: Request, res: Response) => {
-  const { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, telefonoCliente } = req.body
+  const { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, latitudEntrega, longitudEntrega, telefonoCliente } = req.body
   const orden = await crearOrden(
-    { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, telefonoCliente },
+    { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, latitudEntrega, longitudEntrega, telefonoCliente },
     req.usuario?.id,
   )
 
@@ -88,5 +99,24 @@ export const getOrdenesByUsuarioController = async (req: Request, res: Response)
   const page  = req.query['page']  ? parseInt(req.query['page']  as string) : undefined
   const limit = req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
   const result = await getOrdenesByUsuario(usuarioId, { page, limit })
+  res.json(result)
+}
+
+export const asignarRepartidorController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+
+  const { repartidorId } = req.body as { repartidorId: number }
+  const orden = await asignarRepartidor(id, repartidorId)
+  res.json(orden)
+}
+
+export const getMyDeliveriesController = async (req: Request, res: Response) => {
+  const usuarioId = req.usuario?.id
+  if (!usuarioId) throw new AppError(401, 'No autenticado')
+
+  const page  = req.query['page']  ? parseInt(req.query['page']  as string) : undefined
+  const limit = req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
+  const result = await getMyDeliveries(usuarioId, { page, limit })
   res.json(result)
 }

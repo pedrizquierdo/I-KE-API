@@ -8,10 +8,12 @@ import {
   getOrdenesDeliveryController,
   editarItemsOrdenController,
   actualizarTiempoEstimadoController,
+  asignarRepartidorController,
+  getMyDeliveriesController,
 } from './orders.controller'
 import { verificarToken, verificarTokenOpcional, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
-import { CrearOrdenSchema, CambiarEstadoOrdenSchema, ActualizarItemsOrdenSchema, ActualizarTiempoEstimadoSchema } from '../../schemas'
+import { CrearOrdenSchema, CambiarEstadoOrdenSchema, ActualizarItemsOrdenSchema, ActualizarTiempoEstimadoSchema, AsignarRepartidorSchema } from '../../schemas'
 
 const router = Router()
 
@@ -43,6 +45,14 @@ router.get('/delivery',
   getOrdenesDeliveryController,
 )
 
+// Mis repartos — solo el repartidor autenticado ve los que tiene asignados
+// IMPORTANTE: debe estar antes de '/:id'
+router.get('/my-deliveries',
+  verificarToken,
+  verificarRol('repartidor'),
+  getMyDeliveriesController,
+)
+
 // Ver orden por ID — solo staff
 router.get('/:id',
   verificarToken,
@@ -64,6 +74,14 @@ router.patch('/:id/estimated-time',
   verificarRol('cocinero'),
   validate(ActualizarTiempoEstimadoSchema),
   actualizarTiempoEstimadoController,
+)
+
+// Asignar repartidor — gerente y cajero
+router.patch('/:id/assign-delivery',
+  verificarToken,
+  verificarRol('gerente', 'cajero'),
+  validate(AsignarRepartidorSchema),
+  asignarRepartidorController,
 )
 
 // Cambiar estado — solo staff de cocina/servicio

@@ -22,6 +22,8 @@ interface CrearOrdenDTO {
   notas?: string
   nombreCliente?: string
   direccionEntrega?: string
+  latitudEntrega?: number
+  longitudEntrega?: number
   telefonoCliente?: string
 }
 
@@ -96,6 +98,8 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
         nombre_cliente:    datos.nombreCliente ?? null,
         notas_orden:       datos.notas ?? null,
         direccion_entrega: datos.direccionEntrega ?? null,
+        latitud_entrega:   datos.latitudEntrega  ?? null,
+        longitud_entrega:  datos.longitudEntrega ?? null,
         telefono_cliente:  datos.telefonoCliente ?? null,
         subtotal,
         descuento: 0,
@@ -467,6 +471,88 @@ export const getOrdenesDelivery = async (pagination?: PaginationParams) => {
         },
       },
       orderBy: { creado_en: 'asc' }, // más antiguas primero → prioridad de entrega
+      skip,
+      take: limit,
+    }),
+    prisma.ordenes.count({ where }),
+  ])
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+}
+
+// ─── Asignar repartidor a una orden ──────────────────────────────────────────
+export const asignarRepartidor = async (ordenId: number, repartidorId: number) => {
+  const orden = await prisma.ordenes.findUnique({ where: { id: ordenId } })
+  if (!orden) throw new AppError(404, 'Orden no encontrada')
+  if (orden.tipo_servicio !== 'domicilio') {
+    throw new AppError(400, 'Solo se puede asignar repartidor a órdenes de tipo domicilio')
+  }
+
+  // Verificar que el empleado existe y tiene rol repartidor
+  const empleado = await prisma.empleados.findUnique({ where: { id: repartidorId } })
+  if (!empleado) throw new AppError(404, 'Repartidor no encontrado')
+  if (empleado.rol !== 'repartidor') {
+    throw new AppError(400, `El empleado ${repartidorId} no tiene rol de repartidor`)
+  }
+
+  await prisma.ordenes.update({
+    where: { id: ordenId },
+    data:  { repartidor_id: repartidorId, actualizado_en: new Date() },
+  })
+
+  return getOrdenById(ordenId)
+}
+
+// ─── Mis repartos (vista del repartidor autenticado) ─────────────────────────
+const ESTADOS_ACTIVOS_REPARTIDOR = ['lista', 'en_preparacion']
+
+export const getMyDeliveries = async (usuarioId: number, pagination?: PaginationParams) => {
+  const page  = Math.max(1, pagination?.page ?? 1)
+  const limit = Math.min(100, Math.max(1, pagination?.limit ?? 50))
+  const skip  = (page - 1) * limit
+
+  // Obtener el empleado_id vinculado al usuario autenticado
+  const usuario = await prisma.usuarios.findUnique({
+    where:  { id: usuarioId },
+    select: { empleado_id: true },
+  })
+  if (!usuario?.empleado_id) {
+    throw new AppError(400, 'Tu usuario no tiene un empleado vinculado')
+  }
+
+  const where = {
+    repartidor_id: usuario.empleado_id,
+    tipo_servicio: 'domicilio',
+    estado: { in: ESTADOS_ACTIVOS_REPARTIDOR },
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.ordenes.findMany({
+      where,
+      select: {
+        id:                      true,
+        numero:                  true,
+        estado:                  true,
+        tipo_servicio:           true,
+        nombre_cliente:          true,
+        telefono_cliente:        true,
+        direccion_entrega:       true,
+        latitud_entrega:         true,
+        longitud_entrega:        true,
+        notas_orden:             true,
+        subtotal:                true,
+        total:                   true,
+        tiempo_estimado_minutos: true,
+        creado_en:               true,
+        actualizado_en:          true,
+        orden_detalles: {
+          include: { productos: { select: { id: true, nombre: true, precio_base: true } } },
+        },
+        orden_combos: {
+          include: { combos: { select: { id: true, nombre: true, precio: true } } },
+        },
+      },
+      orderBy: { creado_en: 'asc' },
       skip,
       take: limit,
     }),

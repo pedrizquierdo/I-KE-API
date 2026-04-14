@@ -53,7 +53,8 @@ model empleados {
   mermas                  mermas[]
   movimientos_inventario  movimientos_inventario[]
   orden_estados_historial orden_estados_historial[]
-  ordenes                 ordenes[]
+  ordenes                 ordenes[]                   @relation("orden_empleado")
+  ordenes_repartidor      ordenes[]                   @relation("orden_repartidor")
   servicios               servicios[]
   usuarios                usuarios[]
 }
@@ -202,7 +203,10 @@ model ordenes {
   tiempo_estimado_minutos Int?
   promocion_id            Int?
   direccion_entrega       String?                   @db.VarChar(300)
+  latitud_entrega         Decimal?                  @db.Decimal(9, 6)
+  longitud_entrega        Decimal?                  @db.Decimal(9, 6)
   telefono_cliente        String?                   @db.VarChar(20)
+  repartidor_id           Int?
   subtotal                Decimal                   @default(0) @db.Decimal(10, 2)
   descuento               Decimal                   @default(0) @db.Decimal(10, 2)
   total                   Decimal?                  @default(dbgenerated("(subtotal - descuento)")) @db.Decimal(10, 2)
@@ -212,7 +216,8 @@ model ordenes {
   orden_combos            orden_combos[]
   orden_detalles          orden_detalles[]
   orden_estados_historial orden_estados_historial[]
-  empleados               empleados?                @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  empleados               empleados?                @relation("orden_empleado", fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  repartidor              empleados?                @relation("orden_repartidor", fields: [repartidor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   promociones             promociones?              @relation(fields: [promocion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   servicios               servicios                 @relation(fields: [servicio_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios                usuarios?                 @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
