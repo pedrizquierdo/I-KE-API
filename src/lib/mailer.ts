@@ -6,7 +6,7 @@ const resend = new Resend(env.RESEND_API_KEY)
 // ─── Enviar email de recuperación de contraseña ───────────────────────────────
 export const sendResetEmail = async (email: string, resetUrl: string) => {
   await resend.emails.send({
-    from:    'I KE TACOS BIRRIA <noreply@iketacos.com>',
+    from:    'I KE TACOS BIRRIA <noreply@iketacos.cozcatl.dev>',
     to:      email,
     subject: 'Recupera tu contraseña — I KE TACOS',
     html: `
