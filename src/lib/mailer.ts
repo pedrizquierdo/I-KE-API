@@ -1,40 +1,12 @@
-import nodemailer from 'nodemailer'
-import type SMTPTransport from 'nodemailer/lib/smtp-transport'
+import { Resend } from 'resend'
+import { env } from '../config/env'
 
-// ─── Transporter ──────────────────────────────────────────────────────────────
-// Puerto 465 con SSL (secure: true) + family: 4 fuerza IPv4.
-// Railway no tiene salida IPv6 nativa; sin family:4 Gmail resuelve a IPv6 y
-// el socket falla con ENETUNREACH. `family` es una opción de net.createConnection
-// que nodemailer pasa al TCP layer pero que @types/nodemailer no declara — de ahí
-// la intersección de tipos para que TypeScript no la rechace como excess property.
-const transporter = nodemailer.createTransport({
-  host:   'smtp.gmail.com',
-  port:   465,
-  secure: true,  // SSL en puerto 465
-  family: 4,     // fuerza IPv4 — crítico en Railway
-  connectionTimeout: 200000, // 20 segundos
-  greetingTimeout: 200000,
-  socketTimeout: 200000,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-  tls: {
-    // No falla si el nombre del host no coincide perfectamente o el certificado es interno
-    rejectUnauthorized: false,
-    // Obliga a usar IPv4 también a nivel de socket TLS
-    servername: 'smtp.gmail.com'
-  },
-
-  // DEBUG: Esto imprimirá en los logs de Railway exactamente qué pasa
-  debug: true, 
-  logger: true
-} as SMTPTransport.Options & { family: number })
+const resend = new Resend(env.RESEND_API_KEY)
 
 // ─── Enviar email de recuperación de contraseña ───────────────────────────────
 export const sendResetEmail = async (email: string, resetUrl: string) => {
-  await transporter.sendMail({
-    from:    `"I KE TACOS BIRRIA" <${process.env.GMAIL_USER}>`,
+  await resend.emails.send({
+    from:    'I KE TACOS BIRRIA <noreply@iketacos.com>',
     to:      email,
     subject: 'Recupera tu contraseña — I KE TACOS',
     html: `

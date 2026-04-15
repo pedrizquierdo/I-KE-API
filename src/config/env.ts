@@ -15,10 +15,9 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME es requerida'),
   CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY es requerida'),
   CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET es requerida'),
-  // Gmail / nodemailer
-  GMAIL_USER:          z.string().email('GMAIL_USER debe ser un email válido'),
-  GMAIL_APP_PASSWORD:  z.string().min(1, 'GMAIL_APP_PASSWORD es requerida'),
-  APP_URL:             z.string().url().optional(),
+  // Resend
+  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY es requerida'),
+  APP_URL:        z.string().url().optional(),
 })
 
 const result = envSchema.safeParse(process.env)
