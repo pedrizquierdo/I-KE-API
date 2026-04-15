@@ -118,9 +118,10 @@ export const solicitarResetPassword = async (email: string) => {
 
   const resetUrl = `${env.APP_URL}/reset-password?token=${tokenPlano}`
 
-  // Email sending is best-effort: if Resend fails (bad API key, rate limit, etc.)
-  // we log the error but do NOT propagate — the token is saved and the user can
-  // request again. Propagating would cause a misleading 500 response.
+  // Email sending is best-effort: if Gmail/nodemailer fails (bad credentials,
+  // rate limit, etc.) we log the error but do NOT propagate — the token is
+  // saved and the user can request again. Propagating would cause a misleading
+  // 500 response.
   try {
     await enviarEmailResetPassword(usuario.email, resetUrl)
   } catch (emailErr) {

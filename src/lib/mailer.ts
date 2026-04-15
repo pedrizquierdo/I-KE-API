@@ -1,50 +1,50 @@
-import dns from 'dns'
 import nodemailer from 'nodemailer'
-import { env } from '../config/env'
+import type SMTPTransport from 'nodemailer/lib/smtp-transport'
 
-// Railway no tiene salida IPv6. Gmail resuelve smtp.gmail.com a IPv6 por defecto,
-// causando ENETUNREACH. Forzar ipv4first globalmente asegura que Node.js siempre
-// resuelva a IPv4 primero, tanto para nodemailer como para cualquier otra llamada.
-dns.setDefaultResultOrder('ipv4first')
-
-// Transporter reutilizable — se configura una sola vez al arrancar el servidor.
-export const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_PORT === 465, // true para puerto 465 (SSL), false para STARTTLS (587)
+// ─── Transporter ──────────────────────────────────────────────────────────────
+// Puerto 465 con SSL (secure: true) + family: 4 fuerza IPv4.
+// Railway no tiene salida IPv6 nativa; sin family:4 Gmail resuelve a IPv6 y
+// el socket falla con ENETUNREACH. `family` es una opción de net.createConnection
+// que nodemailer pasa al TCP layer pero que @types/nodemailer no declara — de ahí
+// la intersección de tipos para que TypeScript no la rechace como excess property.
+const transporter = nodemailer.createTransport({
+  host:   'smtp.gmail.com',
+  port:   465,
+  secure: true,  // SSL en puerto 465
+  family: 4,     // fuerza IPv4 — crítico en Railway
   auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
   },
-})
+} as SMTPTransport.Options & { family: number })
 
-// ─── Plantillas ───────────────────────────────────────────────────────────────
-export const enviarEmailResetPassword = async (
-  destinatario: string,
-  resetUrl: string
-) => {
+// ─── Enviar email de recuperación de contraseña ───────────────────────────────
+export const sendResetEmail = async (email: string, resetUrl: string) => {
   await transporter.sendMail({
-    from: `"I KE APP" <${env.SMTP_FROM}>`,
-    to: destinatario,
-    subject: 'Recuperación de contraseña — I KE APP',
-    text: `Recibiste este correo porque solicitaste restablecer tu contraseña.\n\nHaz clic en el siguiente enlace (válido por 1 hora):\n${resetUrl}\n\nSi no solicitaste esto, ignora este mensaje.`,
+    from:    `"I KE TACOS BIRRIA" <${process.env.GMAIL_USER}>`,
+    to:      email,
+    subject: 'Recupera tu contraseña — I KE TACOS',
     html: `
-      <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:8px">
-        <h2 style="color:#1f2937;margin-bottom:8px">Recuperación de contraseña</h2>
-        <p style="color:#6b7280;margin-bottom:24px">
-          Recibiste este correo porque solicitaste restablecer tu contraseña.
-          El enlace es válido por <strong>1 hora</strong>.
-        </p>
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #F28500;">I KE TACOS BIRRIA</h2>
+        <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+        <p>Haz click en el siguiente botón para continuar:</p>
         <a href="${resetUrl}"
-           style="display:inline-block;background:#ef4444;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+           style="display: inline-block; background: #F28500; color: white;
+                  padding: 12px 24px; border-radius: 8px; text-decoration: none;
+                  font-weight: bold; margin: 16px 0;">
           Restablecer contraseña
         </a>
-        <p style="color:#9ca3af;font-size:12px;margin-top:24px">
-          Si no solicitaste esto, puedes ignorar este mensaje.<br>
-          Por seguridad, nunca compartas este enlace.
+        <p style="color: #666; font-size: 12px;">
+          Este enlace expira en 1 hora. Si no solicitaste esto, ignora este correo.
+        </p>
+        <p style="color: #666; font-size: 12px;">
+          O copia este enlace: ${resetUrl}
         </p>
       </div>
     `,
   })
 }
 
+// Alias para compatibilidad con auth.service.ts
+export const enviarEmailResetPassword = sendResetEmail
