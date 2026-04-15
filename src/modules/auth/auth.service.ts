@@ -116,7 +116,7 @@ export const solicitarResetPassword = async (email: string) => {
     },
   })
 
-  const resetUrl = `${env.APP_URL}/reset-password?token=${tokenPlano}`
+  const resetUrl = `${(env.APP_URL ?? '').replace(/\/$/, '')}/reset-password?token=${tokenPlano}`
 
   // Email sending is best-effort: if Resend fails (bad API key, rate limit,
   // etc.) we log the error but do NOT propagate — the token is saved and the
