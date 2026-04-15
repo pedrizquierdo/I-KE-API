@@ -12,9 +12,9 @@ const transporter = nodemailer.createTransport({
   port:   465,
   secure: true,  // SSL en puerto 465
   family: 4,     // fuerza IPv4 — crítico en Railway
-  connectionTimeout: 20000, // 20 segundos
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
+  connectionTimeout: 200000, // 20 segundos
+  greetingTimeout: 200000,
+  socketTimeout: 200000,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
