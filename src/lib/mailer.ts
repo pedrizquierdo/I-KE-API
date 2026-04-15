@@ -1,34 +1,50 @@
-import { Resend } from 'resend'
+import dns from 'dns'
+import nodemailer from 'nodemailer'
+import { env } from '../config/env'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Railway no tiene salida IPv6. Gmail resuelve smtp.gmail.com a IPv6 por defecto,
+// causando ENETUNREACH. Forzar ipv4first globalmente asegura que Node.js siempre
+// resuelva a IPv4 primero, tanto para nodemailer como para cualquier otra llamada.
+dns.setDefaultResultOrder('ipv4first')
+
+// Transporter reutilizable — se configura una sola vez al arrancar el servidor.
+export const transporter = nodemailer.createTransport({
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT,
+  secure: env.SMTP_PORT === 465, // true para puerto 465 (SSL), false para STARTTLS (587)
+  auth: {
+    user: env.SMTP_USER,
+    pass: env.SMTP_PASS,
+  },
+})
 
 // ─── Plantillas ───────────────────────────────────────────────────────────────
 export const enviarEmailResetPassword = async (
   destinatario: string,
   resetUrl: string
 ) => {
-  await resend.emails.send({
-    from: 'I KE TACOS <onboarding@resend.dev>',
+  await transporter.sendMail({
+    from: `"I KE APP" <${env.SMTP_FROM}>`,
     to: destinatario,
-    subject: 'Recupera tu contraseña — I KE TACOS',
+    subject: 'Recuperación de contraseña — I KE APP',
+    text: `Recibiste este correo porque solicitaste restablecer tu contraseña.\n\nHaz clic en el siguiente enlace (válido por 1 hora):\n${resetUrl}\n\nSi no solicitaste esto, ignora este mensaje.`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #F28500;">I KE TACOS BIRRIA</h2>
-        <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-        <p>Haz click en el siguiente botón para continuar:</p>
+      <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:8px">
+        <h2 style="color:#1f2937;margin-bottom:8px">Recuperación de contraseña</h2>
+        <p style="color:#6b7280;margin-bottom:24px">
+          Recibiste este correo porque solicitaste restablecer tu contraseña.
+          El enlace es válido por <strong>1 hora</strong>.
+        </p>
         <a href="${resetUrl}"
-           style="display: inline-block; background: #F28500; color: white;
-                  padding: 12px 24px; border-radius: 8px; text-decoration: none;
-                  font-weight: bold; margin: 16px 0;">
+           style="display:inline-block;background:#ef4444;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
           Restablecer contraseña
         </a>
-        <p style="color: #666; font-size: 12px;">
-          Este enlace expira en 1 hora. Si no solicitaste esto, ignora este correo.
-        </p>
-        <p style="color: #666; font-size: 12px;">
-          O copia este enlace: ${resetUrl}
+        <p style="color:#9ca3af;font-size:12px;margin-top:24px">
+          Si no solicitaste esto, puedes ignorar este mensaje.<br>
+          Por seguridad, nunca compartas este enlace.
         </p>
       </div>
     `,
   })
 }
+
