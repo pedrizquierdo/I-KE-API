@@ -19,6 +19,16 @@ const transporter = nodemailer.createTransport({
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
+  tls: {
+    // No falla si el nombre del host no coincide perfectamente o el certificado es interno
+    rejectUnauthorized: false,
+    // Obliga a usar IPv4 también a nivel de socket TLS
+    servername: 'smtp.gmail.com'
+  },
+
+  // DEBUG: Esto imprimirá en los logs de Railway exactamente qué pasa
+  debug: true, 
+  logger: true
 } as SMTPTransport.Options & { family: number })
 
 // ─── Enviar email de recuperación de contraseña ───────────────────────────────
