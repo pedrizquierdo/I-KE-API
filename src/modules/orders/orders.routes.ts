@@ -49,7 +49,7 @@ router.get('/delivery',
 // IMPORTANTE: debe estar antes de '/:id'
 router.get('/my-deliveries',
   verificarToken,
-  verificarRol('repartidor'),
+  verificarRol('repartidor', 'gerente'),
   getMyDeliveriesController,
 )
 

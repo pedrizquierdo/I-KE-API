@@ -503,28 +503,37 @@ export const asignarRepartidor = async (ordenId: number, repartidorId: number) =
   return getOrdenById(ordenId)
 }
 
-// ─── Mis repartos (vista del repartidor autenticado) ─────────────────────────
+// ─── Mis repartos (vista del repartidor autenticado o del gerente) ───────────
+// Repartidor → solo las órdenes que tiene asignadas (filtro por empleado_id).
+// Gerente    → todas las órdenes de domicilio activas (sin filtro de repartidor).
 const ESTADOS_ACTIVOS_REPARTIDOR = ['lista', 'en_preparacion']
 
-export const getMyDeliveries = async (usuarioId: number, pagination?: PaginationParams) => {
+export const getMyDeliveries = async (usuarioId: number, rol: string, pagination?: PaginationParams) => {
   const page  = Math.max(1, pagination?.page ?? 1)
   const limit = Math.min(100, Math.max(1, pagination?.limit ?? 50))
   const skip  = (page - 1) * limit
 
-  // Obtener el empleado_id vinculado al usuario autenticado
-  const usuario = await prisma.usuarios.findUnique({
-    where:  { id: usuarioId },
-    select: { empleado_id: true },
-  })
-  if (!usuario?.empleado_id) {
-    throw new AppError(400, 'Tu usuario no tiene un empleado vinculado')
-  }
-
-  const where = {
-    repartidor_id: usuario.empleado_id,
+  const where: {
+    tipo_servicio: string
+    estado: { in: string[] }
+    repartidor_id?: number
+  } = {
     tipo_servicio: 'domicilio',
     estado: { in: ESTADOS_ACTIVOS_REPARTIDOR },
   }
+
+  if (rol === 'repartidor') {
+    // Obtener el empleado_id vinculado al usuario autenticado
+    const usuario = await prisma.usuarios.findUnique({
+      where:  { id: usuarioId },
+      select: { empleado_id: true },
+    })
+    if (!usuario?.empleado_id) {
+      throw new AppError(400, 'Tu usuario no tiene un empleado vinculado')
+    }
+    where.repartidor_id = usuario.empleado_id
+  }
+  // rol === 'gerente': no se añade repartidor_id → devuelve todas las entregas activas
 
   const [items, total] = await Promise.all([
     prisma.ordenes.findMany({

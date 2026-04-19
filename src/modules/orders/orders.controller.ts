@@ -113,10 +113,11 @@ export const asignarRepartidorController = async (req: Request, res: Response) =
 
 export const getMyDeliveriesController = async (req: Request, res: Response) => {
   const usuarioId = req.usuario?.id
-  if (!usuarioId) throw new AppError(401, 'No autenticado')
+  const rol       = req.usuario?.rol
+  if (!usuarioId || !rol) throw new AppError(401, 'No autenticado')
 
   const page  = req.query['page']  ? parseInt(req.query['page']  as string) : undefined
   const limit = req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
-  const result = await getMyDeliveries(usuarioId, { page, limit })
+  const result = await getMyDeliveries(usuarioId, rol, { page, limit })
   res.json(result)
 }
