@@ -23,7 +23,7 @@ const envSchema = z.object({
 const result = envSchema.safeParse(process.env)
 
 if (!result.success) {
-  console.error('❌ Variables de entorno inválidas:')
+  console.error('Variables de entorno invalidas:')
   result.error.issues.forEach((issue) => {
     console.error(`  ${issue.path.join('.')}: ${issue.message}`)
   })

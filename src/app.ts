@@ -74,7 +74,7 @@ initSocket(httpServer, corsOrigins)
 
 // ─── Iniciar servidor ─────────────────────────────────────────────────────────
 httpServer.listen(PORT, () => {
-  logger.info(`🌮 Servidor corriendo en http://localhost:${PORT}`)
+  logger.info(`Servidor corriendo en http://localhost:${PORT}`)
 })
 
 export default app
