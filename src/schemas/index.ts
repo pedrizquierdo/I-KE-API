@@ -80,7 +80,7 @@ export const CrearOrdenSchema = z.object({
 })
 
 export const CambiarEstadoOrdenSchema = z.object({
-  estado: z.enum(['pendiente', 'en_preparacion', 'lista', 'entregada', 'cancelada'], {
+  estado: z.enum(['pendiente', 'en_preparacion', 'lista', 'entregada', 'pagada', 'cancelada'], {
     message: 'Estado inválido',
   }),
 })

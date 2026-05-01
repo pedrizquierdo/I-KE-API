@@ -186,12 +186,26 @@ export const getOrdenById = async (id: number) => {
 }
 
 // ─── Cambiar estado de la orden ───────────────────────────────────────────────
-const TRANSICIONES: Record<string, string[]> = {
-  pendiente:      ['en_preparacion', 'cancelada'],
-  en_preparacion: ['lista', 'cancelada'],
-  lista:          ['entregada', 'cancelada'],
-  entregada:      [],
-  cancelada:      [],
+//
+// El flujo varía según tipo_servicio:
+//   domicilio   → lista → entregada (el repartidor entrega) → fin
+//   mostrador / mesa / para_llevar → lista → pagada (el cajero cobra) → fin
+//
+// En todos los casos cancelada está disponible hasta lista (inclusive).
+
+function getTransiciones(tipoServicio: string): Record<string, string[]> {
+  const desdeListaFinal = tipoServicio === 'domicilio'
+    ? ['entregada', 'cancelada']
+    : ['pagada',    'cancelada']
+
+  return {
+    pendiente:      ['en_preparacion', 'cancelada'],
+    en_preparacion: ['lista', 'cancelada'],
+    lista:          desdeListaFinal,
+    entregada:      [],
+    pagada:         [],
+    cancelada:      [],
+  }
 }
 
 export const cambiarEstadoOrden = async (
@@ -202,7 +216,8 @@ export const cambiarEstadoOrden = async (
   const orden = await prisma.ordenes.findUnique({ where: { id } })
   if (!orden) throw new AppError(404, 'Orden no encontrada')
 
-  const transicionesValidas = TRANSICIONES[orden.estado] ?? []
+  const transiciones      = getTransiciones(orden.tipo_servicio)
+  const transicionesValidas = transiciones[orden.estado] ?? []
   if (!transicionesValidas.includes(estado)) {
     throw new AppError(
       422,
