@@ -68,10 +68,10 @@ router.patch('/:id/items',
   editarItemsOrdenController,
 )
 
-// Tiempo estimado — solo el cocinero puede indicarlo
+// Tiempo estimado — cocinero y gerente pueden ajustarlo
 router.patch('/:id/estimated-time',
   verificarToken,
-  verificarRol('cocinero'),
+  verificarRol('cocinero', 'gerente'),
   validate(ActualizarTiempoEstimadoSchema),
   actualizarTiempoEstimadoController,
 )
