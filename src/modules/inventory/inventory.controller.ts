@@ -1,8 +1,8 @@
 import { Request, Response } from 'express'
 import {
   getIngredientes, getAlertasStock, crearIngrediente, actualizarIngrediente,
-  registrarMovimiento, getMovimientos, getUnidadesMedida, getRecetasByProducto,
-  crearReceta, actualizarReceta, eliminarReceta,
+  desactivarIngrediente, registrarMovimiento, getMovimientos, getUnidadesMedida,
+  getRecetasByProducto, crearReceta, actualizarReceta, eliminarReceta,
 } from './inventory.service'
 import { AppError } from '../../lib/AppError'
 
@@ -26,6 +26,13 @@ export const actualizarIngredienteController = async (req: Request, res: Respons
   const id = parseInt(req.params['id'] as string)
   if (isNaN(id)) throw new AppError(400, 'ID inválido')
   const ingrediente = await actualizarIngrediente(id, req.body)
+  res.json(ingrediente)
+}
+
+export const desactivarIngredienteController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  const ingrediente = await desactivarIngrediente(id)
   res.json(ingrediente)
 }
 

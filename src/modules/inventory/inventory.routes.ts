@@ -4,6 +4,7 @@ import {
   getAlertasStockController,
   crearIngredienteController,
   actualizarIngredienteController,
+  desactivarIngredienteController,
   registrarMovimientoController,
   getMovimientosController,
   getUnidadesMedidaController,
@@ -30,10 +31,11 @@ const staffCocina  = [verificarToken, verificarRol('gerente', 'cocinero')]
 router.get('/unidades', verificarToken, getUnidadesMedidaController)
 
 // Ingredientes
-router.get('/',        ...staffCocina, getIngredientesController)
-router.get('/alertas', ...staffCocina, getAlertasStockController)
-router.post('/',       ...soloGerente, validate(CrearIngredienteSchema),     crearIngredienteController)
-router.patch('/:id',   ...soloGerente, validate(ActualizarIngredienteSchema), actualizarIngredienteController)
+router.get('/',           ...staffCocina, getIngredientesController)
+router.get('/alertas',    ...staffCocina, getAlertasStockController)
+router.post('/',          ...soloGerente, validate(CrearIngredienteSchema),      crearIngredienteController)
+router.patch('/:id',      ...soloGerente, validate(ActualizarIngredienteSchema), actualizarIngredienteController)
+router.delete('/:id',     ...soloGerente, desactivarIngredienteController)
 
 // Movimientos
 router.get('/movimientos',   ...staffCocina, getMovimientosController)

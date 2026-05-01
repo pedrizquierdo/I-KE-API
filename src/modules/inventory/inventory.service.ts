@@ -94,6 +94,17 @@ export const actualizarIngrediente = async (
   })
 }
 
+export const desactivarIngrediente = async (id: number) => {
+  const ingrediente = await prisma.ingredientes.findUnique({ where: { id } })
+  if (!ingrediente) throw new AppError(404, 'Ingrediente no encontrado')
+
+  return await prisma.ingredientes.update({
+    where: { id },
+    data: { activo: false },
+    include: { unidades_medida: { select: { id: true, nombre: true, simbolo: true } } }
+  })
+}
+
 // ─── Movimientos de inventario ────────────────────────────────────────────────
 export const registrarMovimiento = async (datos: MovimientoDTO) => {
   const ingrediente = await prisma.ingredientes.findUnique({
