@@ -221,7 +221,117 @@ export const cambiarEstadoOrden = async (
     }),
   ])
 
+  // ── Descuento automático de inventario al iniciar preparación ──────────────
+  if (estado === 'en_preparacion') {
+    await descontarIngredientes(id, ordenActualizada.numero)
+  }
+
   return ordenActualizada
+}
+
+// ─── Descuento de ingredientes por receta ─────────────────────────────────────
+async function descontarIngredientes(ordenId: number, numeroOrden: string): Promise<void> {
+  // 1. Cargar la orden con productos directos y productos dentro de combos
+  const ordenCompleta = await prisma.ordenes.findUnique({
+    where: { id: ordenId },
+    include: {
+      orden_detalles: {
+        select: { producto_id: true, cantidad: true },
+      },
+      orden_combos: {
+        select: {
+          cantidad: true,
+          combos: {
+            select: {
+              combo_items: {
+                select: { producto_id: true, cantidad: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!ordenCompleta) return
+
+  // 2. Acumular productos + cantidades (directos y dentro de combos)
+  //    Usamos un Map para colapsar duplicados (mismo producto_id en varias filas)
+  const productosMap = new Map<number, number>()
+
+  for (const d of ordenCompleta.orden_detalles) {
+    productosMap.set(
+      d.producto_id,
+      (productosMap.get(d.producto_id) ?? 0) + d.cantidad,
+    )
+  }
+
+  for (const oc of ordenCompleta.orden_combos) {
+    for (const item of oc.combos.combo_items) {
+      const total = item.cantidad * oc.cantidad
+      productosMap.set(
+        item.producto_id,
+        (productosMap.get(item.producto_id) ?? 0) + total,
+      )
+    }
+  }
+
+  if (productosMap.size === 0) return
+
+  // 3. Traer todas las recetas para los productos de la orden en una sola query
+  const recetas = await prisma.recetas.findMany({
+    where: { producto_id: { in: [...productosMap.keys()] } },
+    select: { producto_id: true, ingrediente_id: true, cantidad: true },
+  })
+
+  if (recetas.length === 0) return
+
+  // 4. Calcular la cantidad total a descontar por ingrediente
+  const descuentoMap = new Map<number, number>() // ingrediente_id → cantidad a restar
+
+  for (const receta of recetas) {
+    const cantProd  = productosMap.get(receta.producto_id) ?? 0
+    const aDescontar = toNum(receta.cantidad) * cantProd
+    descuentoMap.set(
+      receta.ingrediente_id,
+      (descuentoMap.get(receta.ingrediente_id) ?? 0) + aDescontar,
+    )
+  }
+
+  // 5. Traer stock actual de los ingredientes involucrados en una sola query
+  const ingIds = [...descuentoMap.keys()]
+  const ingredientes = await prisma.ingredientes.findMany({
+    where: { id: { in: ingIds } },
+    select: { id: true, stock_actual: true },
+  })
+  const stockMap = new Map(ingredientes.map((i) => [i.id, toNum(i.stock_actual)]))
+
+  // 6. Ejecutar todas las actualizaciones en una sola transacción
+  const motivo = `Orden ${numeroOrden}`
+  await prisma.$transaction(
+    ingIds.flatMap((ingId) => {
+      const aDescontar   = descuentoMap.get(ingId) ?? 0
+      const stockActual  = stockMap.get(ingId) ?? 0
+      const nuevoStock   = Math.max(0, stockActual - aDescontar)
+      const cantMovimiento = -(Math.min(aDescontar, stockActual)) // negativo, nunca menor que -stockActual
+
+      return [
+        prisma.ingredientes.update({
+          where: { id: ingId },
+          data:  { stock_actual: nuevoStock },
+        }),
+        prisma.movimientos_inventario.create({
+          data: {
+            ingrediente_id: ingId,
+            tipo:           'venta',
+            cantidad:       cantMovimiento,
+            referencia_id:  ordenId,
+            motivo,
+          },
+        }),
+      ]
+    }),
+  )
 }
 
 // ─── Actualizar tiempo estimado (solo cocinero) ───────────────────────────────
