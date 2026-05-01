@@ -9,6 +9,8 @@ import {
   getUnidadesMedidaController,
   getRecetasByProductoController,
   crearRecetaController,
+  actualizarRecetaController,
+  eliminarRecetaController,
 } from './inventory.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
@@ -38,7 +40,9 @@ router.get('/movimientos',   ...staffCocina, getMovimientosController)
 router.post('/movimientos',  ...staffCocina, validate(RegistrarMovimientoSchema), registrarMovimientoController)
 
 // Recetas
-router.get('/recetas/:id',   ...staffCocina, getRecetasByProductoController)
-router.post('/recetas',      ...soloGerente, validate(CrearRecetaSchema), crearRecetaController)
+router.get('/recetas/:id',                           ...staffCocina, getRecetasByProductoController)
+router.post('/recetas',                              ...soloGerente, validate(CrearRecetaSchema), crearRecetaController)
+router.patch('/recetas/:productoId/:ingredienteId',  ...soloGerente, actualizarRecetaController)
+router.delete('/recetas/:productoId/:ingredienteId', ...soloGerente, eliminarRecetaController)
 
 export { router as inventoryRoutes }

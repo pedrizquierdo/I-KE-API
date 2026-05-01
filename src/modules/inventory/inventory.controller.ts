@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import {
   getIngredientes, getAlertasStock, crearIngrediente, actualizarIngrediente,
-  registrarMovimiento, getMovimientos, getUnidadesMedida, getRecetasByProducto, crearReceta,
+  registrarMovimiento, getMovimientos, getUnidadesMedida, getRecetasByProducto,
+  crearReceta, actualizarReceta, eliminarReceta,
 } from './inventory.service'
 import { AppError } from '../../lib/AppError'
 
@@ -62,4 +63,23 @@ export const crearRecetaController = async (req: Request, res: Response) => {
   const { productoId, ingredienteId, cantidad } = req.body
   const receta = await crearReceta(productoId, ingredienteId, cantidad)
   res.status(201).json(receta)
+}
+
+export const actualizarRecetaController = async (req: Request, res: Response) => {
+  const productoId    = parseInt(req.params['productoId'] as string)
+  const ingredienteId = parseInt(req.params['ingredienteId'] as string)
+  if (isNaN(productoId) || isNaN(ingredienteId)) throw new AppError(400, 'IDs inválidos')
+  const { cantidad } = req.body
+  if (typeof cantidad !== 'number' || cantidad <= 0)
+    throw new AppError(400, 'cantidad debe ser un número mayor a 0')
+  const receta = await actualizarReceta(productoId, ingredienteId, cantidad)
+  res.json(receta)
+}
+
+export const eliminarRecetaController = async (req: Request, res: Response) => {
+  const productoId    = parseInt(req.params['productoId'] as string)
+  const ingredienteId = parseInt(req.params['ingredienteId'] as string)
+  if (isNaN(productoId) || isNaN(ingredienteId)) throw new AppError(400, 'IDs inválidos')
+  await eliminarReceta(productoId, ingredienteId)
+  res.status(204).send()
 }

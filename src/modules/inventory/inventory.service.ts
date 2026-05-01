@@ -187,3 +187,31 @@ export const crearReceta = async (
     data: { producto_id: productoId, ingrediente_id: ingredienteId, cantidad }
   })
 }
+
+export const actualizarReceta = async (
+  productoId: number,
+  ingredienteId: number,
+  cantidad: number
+) => {
+  const existe = await prisma.recetas.findUnique({
+    where: { producto_id_ingrediente_id: { producto_id: productoId, ingrediente_id: ingredienteId } }
+  })
+  if (!existe) throw new AppError(404, 'Receta no encontrada')
+  if (cantidad <= 0) throw new AppError(400, 'La cantidad debe ser mayor a 0')
+
+  return await prisma.recetas.update({
+    where: { producto_id_ingrediente_id: { producto_id: productoId, ingrediente_id: ingredienteId } },
+    data: { cantidad }
+  })
+}
+
+export const eliminarReceta = async (productoId: number, ingredienteId: number) => {
+  const existe = await prisma.recetas.findUnique({
+    where: { producto_id_ingrediente_id: { producto_id: productoId, ingrediente_id: ingredienteId } }
+  })
+  if (!existe) throw new AppError(404, 'Receta no encontrada')
+
+  return await prisma.recetas.delete({
+    where: { producto_id_ingrediente_id: { producto_id: productoId, ingrediente_id: ingredienteId } }
+  })
+}
