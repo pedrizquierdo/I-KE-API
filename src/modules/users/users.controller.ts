@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { getUsuarios, getUsuarioById, actualizarUsuario, desactivarUsuario, buscarUsuarios } from './users.service'
+import { getUsuarios, getUsuarioById, actualizarUsuario, desactivarUsuario, buscarUsuarios, registrarEmpleado } from './users.service'
 import { AppError } from '../../lib/AppError'
 
 export const getUsuariosController = async (req: Request, res: Response) => {
@@ -31,6 +31,15 @@ export const actualizarUsuarioController = async (req: Request, res: Response) =
   if (isNaN(id)) throw new AppError(400, 'ID inválido')
   const { rol, activo, password, empleadoId } = req.body
   const usuario = await actualizarUsuario(id, { rol, activo, password, empleadoId })
+  res.json(usuario)
+}
+
+export const registrarEmpleadoController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  const { nombre, apellido, rol, telefono } = req.body
+  if (!nombre || !apellido || !rol) throw new AppError(400, 'nombre, apellido y rol son obligatorios')
+  const usuario = await registrarEmpleado(id, { nombre, apellido, rol, telefono })
   res.json(usuario)
 }
 

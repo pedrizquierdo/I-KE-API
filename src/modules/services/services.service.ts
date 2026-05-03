@@ -2,18 +2,28 @@ import { prisma } from '../../config/db'
 import { AppError } from '../../lib/AppError'
 
 // ─── Abrir servicio del día ───────────────────────────────────────────────────
-export const abrirServicio = async (empleadoId?: number) => {
+export const abrirServicio = async (usuarioId?: number) => {
   const servicioActivo = await prisma.servicios.findFirst({
     where: { estado: 'abierto' }
   })
 
   if (servicioActivo) throw new AppError(409, 'Ya hay un servicio abierto')
 
+  // Resolver el empleado_id real desde el usuario autenticado
+  let empleadoId: number | null = null
+  if (usuarioId) {
+    const usuario = await prisma.usuarios.findUnique({
+      where: { id: usuarioId },
+      select: { empleado_id: true }
+    })
+    empleadoId = usuario?.empleado_id ?? null
+  }
+
   return await prisma.servicios.create({
     data: {
       ubicacion_id: 1, // I KE TACOS BIRRIA
-      empleado_id: empleadoId ?? null,
-      estado: 'abierto',
+      empleado_id:  empleadoId,
+      estado:       'abierto',
     }
   })
 }
