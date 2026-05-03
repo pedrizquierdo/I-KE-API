@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import {
+  getAllProductosController,
+  getAllCombosController,
   crearProductoController,
   actualizarProductoController,
   eliminarProductoController,
@@ -25,6 +27,10 @@ import {
 const router = Router()
 
 const soloGerente = [verificarToken, verificarRol('gerente')]
+
+// Listados admin (incluyen inactivos)
+router.get('/products',    ...soloGerente, getAllProductosController)
+router.get('/combos-all',  ...soloGerente, getAllCombosController)
 
 // Categorías
 router.post('/categorias',      ...soloGerente, validate(CrearCategoriaSchema),     crearCategoriaController)

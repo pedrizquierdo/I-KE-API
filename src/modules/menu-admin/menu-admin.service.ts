@@ -36,6 +36,35 @@ interface ActualizarComboDTO {
   imagenUrl?: string
 }
 
+// ─── Consultas admin (incluyen inactivos) ────────────────────────────────────
+export const getAllProductos = async () => {
+  return await prisma.productos.findMany({
+    include: {
+      categorias: { select: { id: true, nombre: true } }
+    },
+    orderBy: [
+      { disponible: 'desc' }, // activos primero
+      { nombre: 'asc' },
+    ]
+  })
+}
+
+export const getAllCombos = async () => {
+  return await prisma.combos.findMany({
+    include: {
+      combo_items: {
+        include: {
+          productos: { select: { id: true, nombre: true, precio_base: true } }
+        }
+      }
+    },
+    orderBy: [
+      { disponible: 'desc' },
+      { nombre: 'asc' },
+    ]
+  })
+}
+
 // ─── Productos ────────────────────────────────────────────────────────────────
 export const crearProducto = async (datos: CrearProductoDTO) => {
   const existe = await prisma.productos.findFirst({

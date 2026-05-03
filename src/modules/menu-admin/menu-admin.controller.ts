@@ -1,10 +1,22 @@
 import { Request, Response } from 'express'
 import {
+  getAllProductos, getAllCombos,
   crearProducto, actualizarProducto, eliminarProducto, subirImagenProducto,
   crearCategoria, actualizarCategoria,
   crearCombo, actualizarCombo, eliminarCombo,
 } from './menu-admin.service'
 import { AppError } from '../../lib/AppError'
+
+// ─── Admin: todos los productos / combos (incluye inactivos) ─────────────────
+export const getAllProductosController = async (_req: Request, res: Response) => {
+  const productos = await getAllProductos()
+  res.json(productos)
+}
+
+export const getAllCombosController = async (_req: Request, res: Response) => {
+  const combos = await getAllCombos()
+  res.json(combos)
+}
 
 // ─── Productos ────────────────────────────────────────────────────────────────
 export const crearProductoController = async (req: Request, res: Response) => {
