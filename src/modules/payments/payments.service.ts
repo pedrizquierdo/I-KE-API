@@ -126,14 +126,23 @@ export const subirComprobante = async (pagoId: number, buffer: Buffer) => {
 
   const url = await subirACloudinary(buffer, 'comprobantes')
 
-  return await prisma.pagos.update({
-    where: { id: pagoId },
-    data:  { comprobante_url: url, confirmado: null },
-    include: {
-      metodos_pago: { select: { id: true, nombre: true } },
-      ordenes:      { select: { id: true, numero: true, estado: true, total: true } },
-    },
-  })
+  // Limpiar notas de rechazo al subir un nuevo comprobante
+  const [pagoActualizado] = await prisma.$transaction([
+    prisma.pagos.update({
+      where: { id: pagoId },
+      data:  { comprobante_url: url, confirmado: null },
+      include: {
+        metodos_pago: { select: { id: true, nombre: true } },
+        ordenes:      { select: { id: true, numero: true, estado: true, total: true } },
+      },
+    }),
+    prisma.ordenes.update({
+      where: { id: pago.orden_id },
+      data:  { notas_orden: null, actualizado_en: new Date() },
+    }),
+  ])
+
+  return pagoActualizado
 }
 
 // ─── Aprobar o rechazar comprobante ──────────────────────────────────────────
@@ -170,15 +179,23 @@ export const confirmarPago = async (
     ])
     return pagoActualizado
   } else {
-    // ── Rechazar: limpiar comprobante, orden permanece en su estado actual ────
-    return await prisma.pagos.update({
-      where: { id: pagoId },
-      data:  { confirmado: false, notas_confirmacion: notas ?? null, comprobante_url: null },
-      include: {
-        metodos_pago: { select: { id: true, nombre: true } },
-        ordenes:      { select: { id: true, numero: true, estado: true, total: true } },
-      },
-    })
+    // ── Rechazar: limpiar comprobante y agregar nota en la orden ─────────────
+    const notaRechazo = `Comprobante rechazado${notas ? ': ' + notas : '. Por favor sube un nuevo comprobante.'}`
+    const [pagoActualizado] = await prisma.$transaction([
+      prisma.pagos.update({
+        where: { id: pagoId },
+        data:  { confirmado: false, notas_confirmacion: notas ?? null, comprobante_url: null },
+        include: {
+          metodos_pago: { select: { id: true, nombre: true } },
+          ordenes:      { select: { id: true, numero: true, estado: true, total: true } },
+        },
+      }),
+      prisma.ordenes.update({
+        where: { id: pago.orden_id },
+        data:  { estado: 'pendiente', notas_orden: notaRechazo, actualizado_en: new Date() },
+      }),
+    ])
+    return pagoActualizado
   }
 }
 

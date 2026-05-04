@@ -733,6 +733,14 @@ export const getOrdenesByUsuario = async (usuarioId: number, pagination?: Pagina
             combos: { select: { id: true, nombre: true, precio: true } },
           },
         },
+        pagos: {
+          select: {
+            id: true,
+            comprobante_url: true,
+            confirmado: true,
+            metodo_pago_id: true,
+          },
+        },
       },
       orderBy: { creado_en: 'desc' },
       skip,
