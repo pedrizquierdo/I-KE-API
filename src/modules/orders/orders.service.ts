@@ -1,5 +1,6 @@
 import { prisma } from '../../config/db'
 import { getServicioActivo } from '../services/services.service'
+import { getEmpleadoId } from '../../config/helpers'
 import { Decimal } from '@prisma/client/runtime/library'
 import { AppError } from '../../lib/AppError'
 
@@ -211,7 +212,7 @@ function getTransiciones(tipoServicio: string): Record<string, string[]> {
 export const cambiarEstadoOrden = async (
   id: number,
   estado: string,
-  empleadoId?: number
+  usuarioId?: number          // recibe usuario.id — se resuelve a empleado.id internamente
 ) => {
   const orden = await prisma.ordenes.findUnique({ where: { id } })
   if (!orden) throw new AppError(404, 'Orden no encontrada')
@@ -226,13 +227,16 @@ export const cambiarEstadoOrden = async (
     )
   }
 
+  // Resolver el empleado_id real (FK a tabla empleados, no usuarios)
+  const empleadoId = await getEmpleadoId(usuarioId)
+
   const [ordenActualizada] = await prisma.$transaction([
     prisma.ordenes.update({
       where: { id },
       data: { estado, actualizado_en: new Date() },
     }),
     prisma.orden_estados_historial.create({
-      data: { orden_id: id, estado, empleado_id: empleadoId ?? null },
+      data: { orden_id: id, estado, empleado_id: empleadoId },
     }),
   ])
 

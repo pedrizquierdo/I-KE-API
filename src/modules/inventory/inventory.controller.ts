@@ -39,7 +39,7 @@ export const desactivarIngredienteController = async (req: Request, res: Respons
 export const registrarMovimientoController = async (req: Request, res: Response) => {
   const { ingredienteId, tipo, cantidad, motivo } = req.body
   const movimiento = await registrarMovimiento({
-    ingredienteId, tipo, cantidad, motivo, empleadoId: req.usuario?.id,
+    ingredienteId, tipo, cantidad, motivo, usuarioId: req.usuario?.id,
   })
   res.status(201).json(movimiento)
 }

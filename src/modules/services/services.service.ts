@@ -1,5 +1,6 @@
 import { prisma } from '../../config/db'
 import { AppError } from '../../lib/AppError'
+import { getEmpleadoId } from '../../config/helpers'
 
 // ─── Abrir servicio del día ───────────────────────────────────────────────────
 export const abrirServicio = async (usuarioId?: number) => {
@@ -9,15 +10,8 @@ export const abrirServicio = async (usuarioId?: number) => {
 
   if (servicioActivo) throw new AppError(409, 'Ya hay un servicio abierto')
 
-  // Resolver el empleado_id real desde el usuario autenticado
-  let empleadoId: number | null = null
-  if (usuarioId) {
-    const usuario = await prisma.usuarios.findUnique({
-      where: { id: usuarioId },
-      select: { empleado_id: true }
-    })
-    empleadoId = usuario?.empleado_id ?? null
-  }
+  // Resolver el empleado_id real (FK a tabla empleados, no usuarios)
+  const empleadoId = await getEmpleadoId(usuarioId)
 
   return await prisma.servicios.create({
     data: {

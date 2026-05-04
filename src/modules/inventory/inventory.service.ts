@@ -1,5 +1,6 @@
 import { prisma } from '../../config/db'
 import { AppError } from '../../lib/AppError'
+import { getEmpleadoId } from '../../config/helpers'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface CrearIngredienteDTO {
@@ -17,7 +18,7 @@ interface MovimientoDTO {
   tipo: 'entrada' | 'ajuste' | 'merma' | 'caducidad'
   cantidad: number
   motivo?: string
-  empleadoId?: number
+  usuarioId?: number   // recibe usuario.id — se resuelve a empleado.id internamente
 }
 
 export interface PaginationParams {
@@ -122,13 +123,16 @@ export const registrarMovimiento = async (datos: MovimientoDTO) => {
     throw new AppError(400, `Stock insuficiente. Stock actual: ${ingrediente.stock_actual}`)
   }
 
+  // Resolver el empleado_id real (FK a tabla empleados, no usuarios)
+  const empleadoId = await getEmpleadoId(datos.usuarioId)
+
   const [movimiento] = await prisma.$transaction([
     prisma.movimientos_inventario.create({
       data: {
         ingrediente_id: datos.ingredienteId,
         tipo: datos.tipo,
         cantidad: cantidadReal,
-        empleado_id: datos.empleadoId ?? null,
+        empleado_id: empleadoId,
         motivo: datos.motivo ?? null,
       }
     }),
