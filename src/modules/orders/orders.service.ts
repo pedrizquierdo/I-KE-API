@@ -658,7 +658,8 @@ export const getMyDeliveries = async (usuarioId: number, rol: string, pagination
       select: { empleado_id: true },
     })
     if (!usuario?.empleado_id) {
-      throw new AppError(400, 'Tu usuario no tiene un empleado vinculado')
+      // Sin empleado vinculado → sin entregas asignadas, no es un error
+      return { items: [], total: 0, page, limit, totalPages: 0 }
     }
     where.repartidor_id = usuario.empleado_id
   }
