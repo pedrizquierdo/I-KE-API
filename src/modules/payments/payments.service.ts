@@ -162,7 +162,11 @@ export const confirmarPago = async (
   }
 
   if (aprobado) {
-    // ── Aprobar: marcar pago y cerrar la orden ────────────────────────────────
+    // ── Aprobar: marcar pago y actualizar la orden según tipo de servicio ─────
+    // Domicilio → 'lista' (el repartidor aún debe entregar)
+    // Mostrador → 'entregada' (el cliente recoge en caja)
+    const nuevoEstado = pago.ordenes.tipo_servicio === 'domicilio' ? 'lista' : 'entregada'
+
     const [pagoActualizado] = await prisma.$transaction([
       prisma.pagos.update({
         where: { id: pagoId },
@@ -174,7 +178,7 @@ export const confirmarPago = async (
       }),
       prisma.ordenes.update({
         where: { id: pago.orden_id },
-        data:  { estado: 'entregada', actualizado_en: new Date() },
+        data:  { estado: nuevoEstado, actualizado_en: new Date() },
       }),
     ])
     return pagoActualizado

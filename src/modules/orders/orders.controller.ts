@@ -77,7 +77,7 @@ export const cambiarEstadoOrdenController = async (req: Request, res: Response) 
   if (isNaN(id)) throw new AppError(400, 'ID inválido')
 
   const { estado } = req.body
-  const orden = await cambiarEstadoOrden(id, estado, req.usuario?.id)
+  const orden = await cambiarEstadoOrden(id, estado, req.usuario?.id, req.usuario?.rol)
 
   // Notificar cambio de estado en tiempo real a la pantalla de cocina
   getIo().to('cocina').emit('orden:estado', { id: orden.id, estado: orden.estado, orden })

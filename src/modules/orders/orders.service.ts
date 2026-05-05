@@ -212,7 +212,8 @@ function getTransiciones(tipoServicio: string): Record<string, string[]> {
 export const cambiarEstadoOrden = async (
   id: number,
   estado: string,
-  usuarioId?: number          // recibe usuario.id — se resuelve a empleado.id internamente
+  usuarioId?: number,         // recibe usuario.id — se resuelve a empleado.id internamente
+  rolUsuario?: string         // rol del usuario autenticado, para validar permisos
 ) => {
   const orden = await prisma.ordenes.findUnique({ where: { id } })
   if (!orden) throw new AppError(404, 'Orden no encontrada')
@@ -224,6 +225,18 @@ export const cambiarEstadoOrden = async (
       422,
       `No se puede pasar de "${orden.estado}" a "${estado}". ` +
       `Transiciones válidas: ${transicionesValidas.join(', ') || 'ninguna'}`
+    )
+  }
+
+  // Solo el repartidor (o gerente) puede marcar como entregada una orden a domicilio
+  if (
+    estado === 'entregada' &&
+    orden.tipo_servicio === 'domicilio' &&
+    !['repartidor', 'gerente'].includes(rolUsuario ?? '')
+  ) {
+    throw new AppError(
+      403,
+      'Solo el repartidor puede marcar como entregada una orden a domicilio'
     )
   }
 
