@@ -402,7 +402,8 @@ interface EditarItemsOrdenDTO {
 export const editarItemsOrden = async (
   ordenId: number,
   datos: EditarItemsOrdenDTO,
-  empleadoId?: number,
+  usuarioId?: number,
+  rolUsuario?: string,
 ) => {
   // ── 1. Cargar orden con sus items actuales ───────────────────────────────────
   const orden = await prisma.ordenes.findUnique({
@@ -410,6 +411,16 @@ export const editarItemsOrden = async (
     include: { orden_detalles: true, orden_combos: true },
   })
   if (!orden) throw new AppError(404, 'Orden no encontrada')
+
+  // Clientes solo pueden modificar sus propias órdenes y únicamente si están pendientes
+  if (rolUsuario === 'cliente') {
+    if (orden.usuario_id !== usuarioId) {
+      throw new AppError(403, 'No tienes permiso para modificar esta orden')
+    }
+    if (orden.estado !== 'pendiente') {
+      throw new AppError(400, 'Solo puedes modificar órdenes en estado pendiente')
+    }
+  }
 
   if (!['pendiente', 'en_preparacion'].includes(orden.estado)) {
     throw new AppError(

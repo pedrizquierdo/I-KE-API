@@ -60,10 +60,10 @@ router.get('/:id',
   getOrdenByIdController,
 )
 
-// Editar items (agregar / cambiar cantidad / eliminar) — gerente, cajero, mesero
+// Editar items — cualquier usuario autenticado puede intentarlo;
+// la validación de ownership y estado va en el service
 router.patch('/:id/items',
   verificarToken,
-  verificarRol('gerente', 'cajero', 'mesero'),
   validate(ActualizarItemsOrdenSchema),
   editarItemsOrdenController,
 )

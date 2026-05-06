@@ -46,7 +46,7 @@ export const editarItemsOrdenController = async (req: Request, res: Response) =>
   if (isNaN(id)) throw new AppError(400, 'ID inválido')
 
   const { productos, combos } = req.body
-  const orden = await editarItemsOrden(id, { productos, combos }, req.usuario?.id)
+  const orden = await editarItemsOrden(id, { productos, combos }, req.usuario?.id, req.usuario?.rol)
 
   // Notificar a cocina: la orden cambió su composición
   getIo().to('cocina').emit('orden:items_actualizados', { id: orden.id, estado: orden.estado, orden })
