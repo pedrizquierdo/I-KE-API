@@ -765,9 +765,10 @@ export const getOrdenesByUsuario = async (usuarioId: number, pagination?: Pagina
         pagos: {
           select: {
             id: true,
+            metodo_pago_id: true,
+            monto: true,
             comprobante_url: true,
             confirmado: true,
-            metodo_pago_id: true,
           },
         },
       },
