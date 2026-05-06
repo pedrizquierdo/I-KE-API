@@ -657,23 +657,25 @@ export const asignarRepartidor = async (ordenId: number, repartidorId: number) =
 }
 
 // ─── Mis repartos (vista del repartidor autenticado o del gerente) ───────────
-// Repartidor → solo las órdenes que tiene asignadas (filtro por empleado_id).
-// Gerente    → todas las órdenes de domicilio activas (sin filtro de repartidor).
-const ESTADOS_ACTIVOS_REPARTIDOR = ['lista', 'en_preparacion']
+// Repartidor (modelo freelancer):
+//   - Ve las órdenes que tiene asignadas (repartidor_id = su empleado_id)
+//   - Ve las órdenes sin repartidor asignado aún (repartidor_id = null)
+//   - Esto permite que tome cualquier pedido disponible
+// Gerente → todas las órdenes de domicilio activas
+const ESTADOS_ACTIVOS_REPARTIDOR = ['pendiente', 'en_preparacion', 'lista']
 
 export const getMyDeliveries = async (usuarioId: number, rol: string, pagination?: PaginationParams) => {
   const page  = Math.max(1, pagination?.page ?? 1)
   const limit = Math.min(100, Math.max(1, pagination?.limit ?? 50))
   const skip  = (page - 1) * limit
 
-  const where: {
-    tipo_servicio: string
-    estado: { in: string[] }
-    repartidor_id?: number
-  } = {
+  const baseWhere = {
     tipo_servicio: 'domicilio',
     estado: { in: ESTADOS_ACTIVOS_REPARTIDOR },
   }
+
+  // Construir where con soporte para OR (modelo freelancer del repartidor)
+  let where: Record<string, unknown> = { ...baseWhere }
 
   if (rol === 'repartidor') {
     // Obtener el empleado_id vinculado al usuario autenticado
@@ -682,16 +684,26 @@ export const getMyDeliveries = async (usuarioId: number, rol: string, pagination
       select: { empleado_id: true },
     })
     if (!usuario?.empleado_id) {
-      // Sin empleado vinculado → sin entregas asignadas, no es un error
+      // Sin empleado vinculado → sin entregas disponibles, no es un error
       return { items: [], total: 0, page, limit, totalPages: 0 }
     }
-    where.repartidor_id = usuario.empleado_id
+    // Ver órdenes asignadas a este repartidor O sin repartidor asignado aún
+    where = {
+      ...baseWhere,
+      OR: [
+        { repartidor_id: usuario.empleado_id },
+        { repartidor_id: null },
+      ],
+    }
   }
-  // rol === 'gerente': no se añade repartidor_id → devuelve todas las entregas activas
+  // rol === 'gerente': sin filtro de repartidor → ve todas las entregas activas
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaWhere = where as any
 
   const [items, total] = await Promise.all([
     prisma.ordenes.findMany({
-      where,
+      where: prismaWhere,
       select: {
         id:                      true,
         numero:                  true,
@@ -719,7 +731,7 @@ export const getMyDeliveries = async (usuarioId: number, rol: string, pagination
       skip,
       take: limit,
     }),
-    prisma.ordenes.count({ where }),
+    prisma.ordenes.count({ where: prismaWhere }),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
