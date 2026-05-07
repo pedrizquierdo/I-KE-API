@@ -506,13 +506,11 @@ export const editarItemsOrden = async (
     for (const item of productosUpsert) {
       const existente = detallesMap.get(item.productoId)
       if (existente) {
-        // Actualizar cantidad y recalcular subtotal de la fila.
-        // dbgenerated() solo aplica en INSERT — hay que computarlo manualmente en UPDATE.
+        // subtotal es columna generada en BD (cantidad * precio_unitario) — no se escribe
         await tx.orden_detalles.update({
           where: { id: existente.id },
           data: {
             cantidad: item.cantidad,
-            subtotal: new Decimal(item.cantidad).mul(existente.precio_unitario),
             ...(item.notas !== undefined ? { notas_item: item.notas } : {}),
           },
         })
@@ -534,11 +532,11 @@ export const editarItemsOrden = async (
     for (const item of combosUpsert) {
       const existente = combosMap.get(item.comboId)
       if (existente) {
+        // subtotal es columna generada en BD — no se escribe
         await tx.orden_combos.update({
           where: { id: existente.id },
           data: {
             cantidad: item.cantidad,
-            subtotal: new Decimal(item.cantidad).mul(existente.precio_unitario),
           },
         })
       } else {
