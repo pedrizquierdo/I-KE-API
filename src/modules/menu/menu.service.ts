@@ -1,4 +1,5 @@
 import { prisma } from '../../config/db'
+import { promocionesActivasHoy } from '../../config/helpers'
 
 export const fetchCategorias = async () => {
   return await prisma.categorias.findMany({
@@ -78,45 +79,26 @@ export const fetchCombos = async () => {
           },
         },
       },
+      // Solo incluir las promociones que apliquen hoy (por día y rango de fechas).
+      // Evita que promos con solo_dia='jueves' aparezcan en días distintos.
+      promociones: {
+        where: promocionesActivasHoy(),
+        select: {
+          id:             true,
+          nombre:         true,
+          tipo_descuento: true,
+          valor:          true,
+          solo_dia:       true,
+        },
+      },
     },
     orderBy: { nombre: 'asc' },
   })
 }
 
 export const fetchPromociones = async () => {
-  const ahora = new Date()
-
-  // Railway corre en UTC, ajustamos a la zona horaria de Sonora (UTC-7)
-  const zonaHoraria = 'America/Hermosillo'
-  const diaHoy = ahora.toLocaleDateString('es-MX', {
-    weekday: 'long',
-    timeZone: zonaHoraria
-  }).normalize('NFD')
-   .replace(/[\u0300-\u036f]/g, '') // quita acentos
-   .toLowerCase()
-
   const rows = await prisma.promociones.findMany({
-    where: {
-      activo: true,
-      OR: [
-        { solo_dia: null },
-        { solo_dia: diaHoy },
-      ],
-      AND: [
-        {
-          OR: [
-            { fecha_inicio: null },
-            { fecha_inicio: { lte: ahora } },
-          ],
-        },
-        {
-          OR: [
-            { fecha_fin: null },
-            { fecha_fin: { gte: ahora } },
-          ],
-        },
-      ],
-    },
+    where: promocionesActivasHoy(),
     include: {
       combos: {
         select: { id: true, nombre: true, precio: true, imagen_url: true },
