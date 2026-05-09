@@ -11,6 +11,10 @@ import {
   crearComboController,
   actualizarComboController,
   eliminarComboController,
+  getAllPromocionesController,
+  crearPromocionController,
+  actualizarPromocionController,
+  eliminarPromocionController,
 } from './menu-admin.controller'
 import { verificarToken, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
@@ -22,6 +26,8 @@ import {
   ActualizarCategoriaSchema,
   CrearComboSchema,
   ActualizarComboSchema,
+  CrearPromocionSchema,
+  ActualizarPromocionSchema,
 } from '../../schemas'
 
 const router = Router()
@@ -46,5 +52,11 @@ router.delete('/productos/:id',      ...soloGerente,                            
 router.post('/combos',      ...soloGerente, validate(CrearComboSchema),     crearComboController)
 router.patch('/combos/:id', ...soloGerente, validate(ActualizarComboSchema), actualizarComboController)
 router.delete('/combos/:id',...soloGerente,                                  eliminarComboController)
+
+// Promociones
+router.get('/promociones',       ...soloGerente,                                       getAllPromocionesController)
+router.post('/promociones',      ...soloGerente, validate(CrearPromocionSchema),       crearPromocionController)
+router.patch('/promociones/:id', ...soloGerente, validate(ActualizarPromocionSchema),  actualizarPromocionController)
+router.delete('/promociones/:id',...soloGerente,                                       eliminarPromocionController)
 
 export { router as menuAdminRoutes }

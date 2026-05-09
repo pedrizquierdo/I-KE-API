@@ -4,6 +4,7 @@ import {
   crearProducto, actualizarProducto, eliminarProducto, subirImagenProducto,
   crearCategoria, actualizarCategoria,
   crearCombo, actualizarCombo, eliminarCombo,
+  getAllPromociones, crearPromocion, actualizarPromocion, eliminarPromocion,
 } from './menu-admin.service'
 import { AppError } from '../../lib/AppError'
 
@@ -80,4 +81,29 @@ export const eliminarComboController = async (req: Request, res: Response) => {
   if (isNaN(id)) throw new AppError(400, 'ID inválido')
   const combo = await eliminarCombo(id)
   res.json(combo)
+}
+
+// ─── Promociones ──────────────────────────────────────────────────────────────
+export const getAllPromocionesController = async (_req: Request, res: Response) => {
+  const promociones = await getAllPromociones()
+  res.json(promociones)
+}
+
+export const crearPromocionController = async (req: Request, res: Response) => {
+  const promocion = await crearPromocion(req.body)
+  res.status(201).json(promocion)
+}
+
+export const actualizarPromocionController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  const promocion = await actualizarPromocion(id, req.body)
+  res.json(promocion)
+}
+
+export const eliminarPromocionController = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string)
+  if (isNaN(id)) throw new AppError(400, 'ID inválido')
+  const promocion = await eliminarPromocion(id)
+  res.json(promocion)
 }

@@ -140,6 +140,85 @@ export const eliminarProducto = async (id: number) => {
   })
 }
 
+// ─── Promociones ──────────────────────────────────────────────────────────────
+interface CrearPromocionDTO {
+  nombre: string
+  descripcion?: string | null
+  tipoDescuento: 'porcentaje' | 'monto_fijo'
+  valor: number
+  comboId?: number | null
+  soloDia?: string | null
+  fechaInicio?: string | null
+  fechaFin?: string | null
+  activo?: boolean
+}
+
+export const getAllPromociones = async () => {
+  return await prisma.promociones.findMany({
+    include: {
+      combos: { select: { id: true, nombre: true, precio: true, imagen_url: true } },
+    },
+    orderBy: [{ activo: 'desc' }, { nombre: 'asc' }],
+  })
+}
+
+export const crearPromocion = async (datos: CrearPromocionDTO) => {
+  return await prisma.promociones.create({
+    data: {
+      nombre: datos.nombre,
+      descripcion: datos.descripcion ?? null,
+      tipo_descuento: datos.tipoDescuento,
+      valor: datos.valor,
+      combo_id: datos.comboId ?? null,
+      solo_dia: datos.soloDia ?? null,
+      fecha_inicio: datos.fechaInicio ? new Date(datos.fechaInicio) : null,
+      fecha_fin: datos.fechaFin ? new Date(datos.fechaFin) : null,
+      activo: datos.activo ?? true,
+    },
+    include: {
+      combos: { select: { id: true, nombre: true, precio: true, imagen_url: true } },
+    },
+  })
+}
+
+export const actualizarPromocion = async (id: number, datos: Partial<CrearPromocionDTO>) => {
+  const existe = await prisma.promociones.findUnique({ where: { id } })
+  if (!existe) throw new AppError(404, 'Promoción no encontrada')
+
+  return await prisma.promociones.update({
+    where: { id },
+    data: {
+      nombre:         datos.nombre        ?? undefined,
+      descripcion:    'descripcion'  in datos ? datos.descripcion  : undefined,
+      tipo_descuento: datos.tipoDescuento  ?? undefined,
+      valor:          datos.valor          ?? undefined,
+      combo_id:       'comboId'      in datos ? datos.comboId      : undefined,
+      solo_dia:       'soloDia'      in datos ? datos.soloDia      : undefined,
+      fecha_inicio:   'fechaInicio'  in datos
+        ? (datos.fechaInicio ? new Date(datos.fechaInicio) : null)
+        : undefined,
+      fecha_fin:      'fechaFin'     in datos
+        ? (datos.fechaFin ? new Date(datos.fechaFin) : null)
+        : undefined,
+      activo:         datos.activo        ?? undefined,
+    },
+    include: {
+      combos: { select: { id: true, nombre: true, precio: true, imagen_url: true } },
+    },
+  })
+}
+
+export const eliminarPromocion = async (id: number) => {
+  const existe = await prisma.promociones.findUnique({ where: { id } })
+  if (!existe) throw new AppError(404, 'Promoción no encontrada')
+
+  return await prisma.promociones.update({
+    where: { id },
+    data: { activo: false },
+    select: { id: true, nombre: true, activo: true },
+  })
+}
+
 // ─── Categorías ───────────────────────────────────────────────────────────────
 export const crearCategoria = async (nombre: string, descripcion?: string) => {
   const existe = await prisma.categorias.findUnique({ where: { nombre } })

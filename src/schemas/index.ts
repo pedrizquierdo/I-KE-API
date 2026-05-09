@@ -310,6 +310,50 @@ export const ReporteInventarioSchema = z.object({
 // ─────────────────────────────────────────────────────────────────────────────
 // USERS
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// MENU ADMIN — Promociones
+// ─────────────────────────────────────────────────────────────────────────────
+const FechaDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido, usa YYYY-MM-DD')
+  .nullable()
+  .optional()
+
+const SoloDiaSchema = z
+  .enum(['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'])
+  .nullable()
+  .optional()
+
+export const CrearPromocionSchema = z.object({
+  nombre:         z.string().min(1).max(150),
+  descripcion:    z.string().max(500).optional().nullable(),
+  tipoDescuento:  z.enum(['porcentaje', 'monto_fijo']),
+  valor:          z.number().positive('El valor debe ser mayor a 0').max(9999.99),
+  comboId:        z.number().int().positive().optional().nullable(),
+  soloDia:        SoloDiaSchema,
+  fechaInicio:    FechaDateSchema,
+  fechaFin:       FechaDateSchema,
+  activo:         z.boolean().optional(),
+})
+
+export const ActualizarPromocionSchema = z.object({
+  nombre:         z.string().min(1).max(150).optional(),
+  descripcion:    z.string().max(500).optional().nullable(),
+  tipoDescuento:  z.enum(['porcentaje', 'monto_fijo']).optional(),
+  valor:          z.number().positive().max(9999.99).optional(),
+  comboId:        z.number().int().positive().optional().nullable(),
+  soloDia:        SoloDiaSchema,
+  fechaInicio:    FechaDateSchema,
+  fechaFin:       FechaDateSchema,
+  activo:         z.boolean().optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'Debes enviar al menos un campo para actualizar' }
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────────────────────
 export const ActualizarUsuarioSchema = z.object({
   rol:        RolSchema.optional(),
   activo:     z.boolean().optional(),
