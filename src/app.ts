@@ -16,6 +16,7 @@ import { reportsRoutes } from './modules/reports/reports.routes'
 import { AppError } from './lib/AppError'
 import { logger } from './lib/logger'
 import { initSocket } from './lib/socket'
+import { diaHoyHermosillo } from './config/helpers'
 
 const app = express()
 const httpServer = http.createServer(app)
@@ -74,7 +75,9 @@ initSocket(httpServer, corsOrigins)
 
 // ─── Iniciar servidor ─────────────────────────────────────────────────────────
 httpServer.listen(PORT, () => {
+  const today = new Date().toLocaleDateString('es-MX', { weekday: 'long' }).toLowerCase()
   logger.info(`Servidor corriendo en http://localhost:${PORT}`)
+  logger.info(`[solo_dia] hoy = "${today}" | diaHoyHermosillo = "${diaHoyHermosillo()}"`)
 })
 
 export default app
