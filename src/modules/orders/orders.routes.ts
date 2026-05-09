@@ -84,10 +84,10 @@ router.patch('/:id/assign-delivery',
   asignarRepartidorController,
 )
 
-// Cambiar estado — solo staff de cocina/servicio
+// Cambiar estado — staff de cocina/servicio + repartidor (para marcar entregada)
 router.patch('/:id/status',
   verificarToken,
-  verificarRol('gerente', 'cajero', 'cocinero', 'mesero'),
+  verificarRol('gerente', 'cajero', 'cocinero', 'mesero', 'repartidor'),
   validate(CambiarEstadoOrdenSchema),
   cambiarEstadoOrdenController,
 )
