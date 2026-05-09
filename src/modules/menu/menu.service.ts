@@ -98,7 +98,7 @@ export const fetchCombos = async () => {
 
 export const fetchPromociones = async () => {
   const rows = await prisma.promociones.findMany({
-    where: promocionesActivasHoy(),
+    where: { activo: true },
     include: {
       combos: {
         select: { id: true, nombre: true, precio: true, imagen_url: true },
