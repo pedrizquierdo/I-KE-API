@@ -1,5 +1,5 @@
 import { prisma } from '../../config/db'
-import { promocionesActivasHoy } from '../../config/helpers'
+import { diaHoyHermosillo } from '../../config/helpers'
 
 export const fetchCategorias = async () => {
   return await prisma.categorias.findMany({
@@ -69,7 +69,7 @@ export const fetchProductosByCategoria = async (categoriaId: number) => {
 }
 
 export const fetchCombos = async () => {
-  return await prisma.combos.findMany({
+  const combos = await prisma.combos.findMany({
     where: { disponible: true },
     include: {
       combo_items: {
@@ -79,10 +79,8 @@ export const fetchCombos = async () => {
           },
         },
       },
-      // Solo incluir las promociones que apliquen hoy (por día y rango de fechas).
-      // Evita que promos con solo_dia='jueves' aparezcan en días distintos.
       promociones: {
-        where: promocionesActivasHoy(),
+        where: { activo: true },
         select: {
           id:             true,
           nombre:         true,
@@ -94,6 +92,14 @@ export const fetchCombos = async () => {
     },
     orderBy: { nombre: 'asc' },
   })
+
+  const diaHoy = diaHoyHermosillo()
+  return combos.map((combo) => ({
+    ...combo,
+    promociones: combo.promociones.filter(
+      (p) => !p.solo_dia || p.solo_dia === diaHoy,
+    ),
+  }))
 }
 
 export const fetchPromociones = async () => {
@@ -106,9 +112,12 @@ export const fetchPromociones = async () => {
     },
   })
 
-  return rows.map((p) => ({
-    ...p,
-    porcentaje: p.tipo_descuento === 'porcentaje' ? p.valor : null,
-    monto_fijo: p.tipo_descuento === 'monto_fijo' ? p.valor : null,
-  }))
+  const diaHoy = diaHoyHermosillo()
+  return rows
+    .filter((p) => !p.solo_dia || p.solo_dia === diaHoy)
+    .map((p) => ({
+      ...p,
+      porcentaje: p.tipo_descuento === 'porcentaje' ? p.valor : null,
+      monto_fijo: p.tipo_descuento === 'monto_fijo' ? p.valor : null,
+    }))
 }
