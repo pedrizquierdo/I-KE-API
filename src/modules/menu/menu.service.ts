@@ -94,12 +94,22 @@ export const fetchCombos = async () => {
   })
 
   const diaHoy = diaHoyHermosillo()
-  return combos.map((combo) => ({
-    ...combo,
-    promociones: combo.promociones.filter(
-      (p) => !p.solo_dia || p.solo_dia === diaHoy,
-    ),
-  }))
+  return combos
+    .filter((combo) => {
+      // Si el combo no tiene promociones, siempre se muestra.
+      // Si TODAS sus promociones tienen solo_dia y ninguna aplica hoy,
+      // el combo es exclusivo de otro día → se oculta.
+      if (combo.promociones.length === 0) return true
+      const todasRestringidas = combo.promociones.every((p) => p.solo_dia !== null)
+      if (!todasRestringidas) return true
+      return combo.promociones.some((p) => p.solo_dia === diaHoy)
+    })
+    .map((combo) => ({
+      ...combo,
+      promociones: combo.promociones.filter(
+        (p) => !p.solo_dia || p.solo_dia === diaHoy,
+      ),
+    }))
 }
 
 export const fetchPromociones = async () => {
