@@ -13,6 +13,7 @@ import { usersRoutes } from './modules/users/users.routes'
 import { menuAdminRoutes } from './modules/menu-admin/menu-admin.routes'
 import { inventoryRoutes } from './modules/inventory/inventory.routes'
 import { reportsRoutes } from './modules/reports/reports.routes'
+import { settingsRoutes } from './modules/settings/settings.routes'
 import { AppError } from './lib/AppError'
 import { logger } from './lib/logger'
 import { initSocket } from './lib/socket'
@@ -49,6 +50,7 @@ app.use('/users', usersRoutes)
 app.use('/admin/menu', menuAdminRoutes)
 app.use('/inventory', inventoryRoutes)
 app.use('/reports', reportsRoutes)
+app.use('/admin/settings', settingsRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'I KE APP backend corriendo' })
