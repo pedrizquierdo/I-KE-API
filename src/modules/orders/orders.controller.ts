@@ -10,14 +10,16 @@ import {
   actualizarTiempoEstimado,
   asignarRepartidor,
   getMyDeliveries,
+  trackOrden,
+  getOrdenesByEmailGuest,
 } from './orders.service'
 import { AppError } from '../../lib/AppError'
 import { getIo } from '../../lib/socket'
 
 export const crearOrdenController = async (req: Request, res: Response) => {
-  const { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, latitudEntrega, longitudEntrega, telefonoCliente } = req.body
+  const { tipoServicio, productos, combos, notas, nombreCliente, emailGuest, direccionEntrega, latitudEntrega, longitudEntrega, telefonoCliente } = req.body
   const orden = await crearOrden(
-    { tipoServicio, productos, combos, notas, nombreCliente, direccionEntrega, latitudEntrega, longitudEntrega, telefonoCliente },
+    { tipoServicio, productos, combos, notas, nombreCliente, emailGuest, direccionEntrega, latitudEntrega, longitudEntrega, telefonoCliente },
     req.usuario?.id,
   )
 
@@ -120,4 +122,16 @@ export const getMyDeliveriesController = async (req: Request, res: Response) => 
   const limit = req.query['limit'] ? parseInt(req.query['limit'] as string) : undefined
   const result = await getMyDeliveries(usuarioId, rol, { page, limit })
   res.json(result)
+}
+
+export const trackOrdenController = async (req: Request, res: Response) => {
+  const { numero } = req.params as { numero: string }
+  const orden = await trackOrden(numero)
+  res.json(orden)
+}
+
+export const trackOrdenPorEmailController = async (req: Request, res: Response) => {
+  const { email } = req.params as { email: string }
+  const ordenes = await getOrdenesByEmailGuest(email)
+  res.json(ordenes)
 }

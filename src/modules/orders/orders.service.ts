@@ -22,6 +22,7 @@ interface CrearOrdenDTO {
   combos?: ComboOrden[]
   notas?: string
   nombreCliente?: string
+  emailGuest?: string
   direccionEntrega?: string
   latitudEntrega?: number
   longitudEntrega?: number
@@ -97,6 +98,7 @@ export const crearOrden = async (datos: CrearOrdenDTO, usuarioId?: number) => {
         usuario_id:        usuarioId ?? null,
         tipo_servicio:     datos.tipoServicio ?? 'mostrador',
         nombre_cliente:    datos.nombreCliente ?? null,
+        email_guest:       datos.emailGuest ?? null,
         notas_orden:       datos.notas ?? null,
         direccion_entrega: datos.direccionEntrega ?? null,
         latitud_entrega:   datos.latitudEntrega  ?? null,
@@ -790,4 +792,76 @@ export const getOrdenesByUsuario = async (usuarioId: number, pagination?: Pagina
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+}
+
+// ─── Tracking público por número de orden ─────────────────────────────────────
+export const trackOrden = async (numero: string) => {
+  const orden = await prisma.ordenes.findUnique({
+    where: { numero },
+    select: {
+      id: true,
+      numero: true,
+      estado: true,
+      tipo_servicio: true,
+      nombre_cliente: true,
+      subtotal: true,
+      total: true,
+      creado_en: true,
+      actualizado_en: true,
+      notas_orden: true,
+      direccion_entrega: true,
+      orden_detalles: {
+        include: {
+          productos: { select: { nombre: true, precio_base: true } },
+        },
+      },
+      orden_combos: {
+        include: {
+          combos: { select: { nombre: true, precio: true } },
+        },
+      },
+      pagos: {
+        select: {
+          id: true,
+          metodo_pago_id: true,
+          monto: true,
+          comprobante_url: true,
+          confirmado: true,
+        },
+      },
+      orden_estados_historial: {
+        orderBy: { registrado_en: 'asc' },
+        select: { estado: true, registrado_en: true },
+      },
+    },
+  })
+
+  if (!orden) throw new AppError(404, 'Orden no encontrada')
+  return orden
+}
+
+// ─── Historial de órdenes por email guest ─────────────────────────────────────
+export const getOrdenesByEmailGuest = async (email: string) => {
+  return await prisma.ordenes.findMany({
+    where: { email_guest: email },
+    select: {
+      id: true,
+      numero: true,
+      estado: true,
+      total: true,
+      creado_en: true,
+      nombre_cliente: true,
+      orden_detalles: {
+        include: {
+          productos: { select: { nombre: true } },
+        },
+      },
+      orden_combos: {
+        include: {
+          combos: { select: { nombre: true } },
+        },
+      },
+    },
+    orderBy: { creado_en: 'desc' },
+  })
 }

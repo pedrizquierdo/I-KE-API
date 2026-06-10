@@ -175,5 +175,11 @@ export const registrar = async (
     }
   })
 
+  // Ligar pedidos anteriores del mismo email como guest
+  await prisma.ordenes.updateMany({
+    where: { email_guest: email, usuario_id: null },
+    data: { usuario_id: usuario.id },
+  })
+
   return { id: usuario.id, email: usuario.email, rol: usuario.rol }
 }

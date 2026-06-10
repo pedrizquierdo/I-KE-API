@@ -53,8 +53,8 @@ model empleados {
   mermas                  mermas[]
   movimientos_inventario  movimientos_inventario[]
   orden_estados_historial orden_estados_historial[]
-  ordenes                 ordenes[]                   @relation("orden_empleado")
-  ordenes_repartidor      ordenes[]                   @relation("orden_repartidor")
+  ordenes                 ordenes[]                 @relation("orden_empleado")
+  ordenes_repartidor      ordenes[]                 @relation("orden_repartidor")
   servicios               servicios[]
   usuarios                usuarios[]
 }
@@ -200,25 +200,26 @@ model ordenes {
   tipo_servicio           String                    @default("mostrador") @db.VarChar(20)
   nombre_cliente          String?                   @db.VarChar(150)
   notas_orden             String?
-  tiempo_estimado_minutos Int?
   promocion_id            Int?
-  direccion_entrega       String?                   @db.VarChar(300)
-  latitud_entrega         Decimal?                  @db.Decimal(9, 6)
-  longitud_entrega        Decimal?                  @db.Decimal(9, 6)
-  telefono_cliente        String?                   @db.VarChar(20)
-  repartidor_id           Int?
   subtotal                Decimal                   @default(0) @db.Decimal(10, 2)
   descuento               Decimal                   @default(0) @db.Decimal(10, 2)
   total                   Decimal?                  @default(dbgenerated("(subtotal - descuento)")) @db.Decimal(10, 2)
   creado_en               DateTime                  @default(now()) @db.Timestamptz(6)
   actualizado_en          DateTime                  @default(now()) @db.Timestamptz(6)
   usuario_id              Int?
+  direccion_entrega       String?                   @db.VarChar(300)
+  telefono_cliente        String?                   @db.VarChar(20)
+  tiempo_estimado_minutos Int?
+  latitud_entrega         Decimal?                  @db.Decimal(9, 6)
+  longitud_entrega        Decimal?                  @db.Decimal(9, 6)
+  repartidor_id           Int?
+  email_guest             String?                   @db.VarChar(150)
   orden_combos            orden_combos[]
   orden_detalles          orden_detalles[]
   orden_estados_historial orden_estados_historial[]
   empleados               empleados?                @relation("orden_empleado", fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  repartidor              empleados?                @relation("orden_repartidor", fields: [repartidor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   promociones             promociones?              @relation(fields: [promocion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  repartidor              empleados?                @relation("orden_repartidor", fields: [repartidor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   servicios               servicios                 @relation(fields: [servicio_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios                usuarios?                 @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   pagos                   pagos[]
@@ -230,17 +231,17 @@ model ordenes {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model pagos {
-  id                   Int          @id @default(autoincrement())
-  orden_id             Int
-  metodo_pago_id       Int
-  monto                Decimal      @db.Decimal(10, 2)
-  referencia           String?      @db.VarChar(100)
-  pagado_en            DateTime     @default(now()) @db.Timestamptz(6)
-  comprobante_url      String?
-  confirmado           Boolean?
-  notas_confirmacion   String?
-  metodos_pago         metodos_pago @relation(fields: [metodo_pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  ordenes              ordenes      @relation(fields: [orden_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id                 Int          @id @default(autoincrement())
+  orden_id           Int
+  metodo_pago_id     Int
+  monto              Decimal      @db.Decimal(10, 2)
+  referencia         String?      @db.VarChar(100)
+  pagado_en          DateTime     @default(now()) @db.Timestamptz(6)
+  comprobante_url    String?
+  confirmado         Boolean?
+  notas_confirmacion String?
+  metodos_pago       metodos_pago @relation(fields: [metodo_pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes            ordenes      @relation(fields: [orden_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model producto_modificador_grupos {
@@ -348,16 +349,16 @@ model unidades_medida {
 }
 
 model usuarios {
-  id                     Int                     @id @default(autoincrement())
-  email                  String                  @unique @db.VarChar(150)
-  password               String                  @db.VarChar(255)
-  rol                    String                  @db.VarChar(50)
-  empleado_id            Int?
-  activo                 Boolean                 @default(true)
-  creado_en              DateTime                @default(now()) @db.Timestamptz(6)
-  ordenes                ordenes[]
-  empleados              empleados?              @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  password_reset_tokens  password_reset_tokens[]
+  id                    Int                     @id @default(autoincrement())
+  email                 String                  @unique @db.VarChar(150)
+  password              String                  @db.VarChar(255)
+  rol                   String                  @db.VarChar(50)
+  empleado_id           Int?
+  activo                Boolean                 @default(true)
+  creado_en             DateTime                @default(now()) @db.Timestamptz(6)
+  ordenes               ordenes[]
+  password_reset_tokens password_reset_tokens[]
+  empleados             empleados?              @relation(fields: [empleado_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model password_reset_tokens {

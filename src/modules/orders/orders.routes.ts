@@ -10,6 +10,8 @@ import {
   actualizarTiempoEstimadoController,
   asignarRepartidorController,
   getMyDeliveriesController,
+  trackOrdenController,
+  trackOrdenPorEmailController,
 } from './orders.controller'
 import { verificarToken, verificarTokenOpcional, verificarRol } from '../../middlewares/auth.middleware'
 import { validate } from '../../middlewares/validate.middleware'
@@ -52,6 +54,11 @@ router.get('/my-deliveries',
   verificarRol('repartidor', 'gerente'),
   getMyDeliveriesController,
 )
+
+// Tracking público — sin autenticación requerida
+// IMPORTANTE: deben estar antes de '/:id' para evitar colisiones
+router.get('/track/:numero', trackOrdenController)
+router.get('/by-email/:email', trackOrdenPorEmailController)
 
 // Ver orden por ID — solo staff
 router.get('/:id',

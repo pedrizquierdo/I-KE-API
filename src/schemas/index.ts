@@ -50,6 +50,7 @@ export const CrearOrdenSchema = z.object({
   combos:           z.array(ComboOrdenSchema).optional(),
   notas:            z.string().max(500).optional(),
   nombreCliente:    z.string().min(1).max(100).optional(),
+  emailGuest:       z.string().email('emailGuest inválido').max(150).optional(),
   direccionEntrega: z.string().min(5).max(300).optional(),
   latitudEntrega:   z.number().min(-90).max(90).optional(),
   longitudEntrega:  z.number().min(-180).max(180).optional(),
